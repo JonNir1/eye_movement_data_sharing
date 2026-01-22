@@ -1,3 +1,8 @@
+# Ignore any Python files with 'secret' in the filename
+*secret*.py
+*dataset*
+*database*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
