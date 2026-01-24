@@ -24,6 +24,10 @@ that do not; and also between different granularities of data-sharing (based on 
 ### Analysis #2: Regression Analysis
 We also attempt to quantify the benefits of sharing data by regressing citation counts on the time since publication,
 and comparing the residuals between articles that share data and those that do not.
+### Analysis #3: Citation Dynamics
+We analyze the citation dynamics - cumulative citations over years from publication, comparing trajectories for
+articles that share eye-movement data and those that do not; as well as between different granularities of data-sharing.<br>
+We exclude data from the year of publication and from the current year (2026) to avoid partial-year effects.
 
 ### References
 ```
