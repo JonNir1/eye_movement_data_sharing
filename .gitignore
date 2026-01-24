@@ -1,7 +1,11 @@
 # Ignore any Python files with 'secret' in the filename
 *secret*.py
+# Ignore datasets
 *dataset*
 *database*
+# Ignore Word docs
+*.docx
+*.doc
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
