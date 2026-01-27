@@ -16,13 +16,19 @@ _DOI_PATTERN = r'(10\.\d{4,9}/[-._;()/:a-zA-Z0-9]+)'
 
 
 def fetch_all_metadata(
-        articles: List[str], sleep_period=0.01, verbose=True,
+        articles: pd.DataFrame,
+        link_column: str = "PAPER_LINK",
+        title_column: str = "PAPER_TITLE",
+        sleep_period=0.01,
+        verbose=True,
 ) -> pd.DataFrame:
     if sleep_period < 0:
         raise ValueError("sleep_period must be non-negative.")
     results = []
-    for article in tqdm(articles, disable=not verbose):
-        metadata = fetch_single_metadata(article)
+    for _, article_row in tqdm(list(articles.iterrows()), disable=not verbose):
+        link = __coerce_string(article_row, link_column)
+        title = __coerce_string(article_row, title_column)
+        metadata = fetch_single_metadata(link, title, article_row.name, verbose=verbose)
         results.append(metadata)
         sleep(sleep_period)     # to respect rate limits of 100 requests per second
     results = (
@@ -31,22 +37,26 @@ def fetch_all_metadata(
             LastUpdate=lambda df: pd.to_datetime(df["LastUpdate"], utc=True),
             PublicationDate=lambda df: pd.to_datetime(df["PublicationDate"], utc=True),
             Pub2UpdateTime=lambda df: df["LastUpdate"] - df["PublicationDate"],
-            MeanNormalizedCitationScore=_calculate_mncs,
+            # MeanNormalizedCitationScore=_calculate_mncs,    # bad calculation; see function docstring
         )
+        .astype({"idx": articles.index.dtype})
+        .set_index("idx")
     )
+    results.index.name = articles.index.name
     return results
 
 
-def fetch_single_metadata(link: str, verbose=True) -> dict:
+def fetch_single_metadata(link: str, title: str, idx, verbose=True) -> dict:
     result = dict()
-    clean_link = link.strip()
     try:
-        work = _fetch_work_by_doi_unsafe(clean_link)
+        work = _fetch_work_by_doi_unsafe(link)
         if not work:
-            work = _fetch_work_by_url_unsafe(clean_link)
+            work = _fetch_work_by_url_unsafe(link)
         if not work:
-            return _return_on_error(link, None, verbose)
-        result["PAPER_LINK"] = link
+            work = _fetch_work_by_title_unsafe(title)
+        if not work:
+            return _return_on_error(link, idx, None, verbose)
+        result["idx"] = idx
         result["DOI"] = work.get("doi")
         result["OpenAlexID"] = work.get("id").split("/")[-1]
         result["LastUpdate"] = work.get("updated_date")
@@ -63,7 +73,7 @@ def fetch_single_metadata(link: str, verbose=True) -> dict:
             result[f"Citations{yr['year']}"] = yr["cited_by_count"]
         return result
     except Exception as e:
-        return _return_on_error(link, e, verbose)
+        return _return_on_error(link, idx, e, verbose)
 
 
 def _fetch_work_by_doi_unsafe(text_with_doi: str) -> Optional[dict]:
@@ -89,15 +99,36 @@ def _fetch_work_by_url_unsafe(article_link: str) -> Optional[dict]:
     return _fetch_work_by_doi_unsafe(resp.text)
 
 
-def _return_on_error(link: str, error: Optional[Exception] = None, verbose: bool = True) -> dict:
+def _fetch_work_by_title_unsafe(title: str) -> Optional[dict]:
+    title = title.strip().lower()
+    found_works = pyalex.Works().search_filter(title=title).get()
+    found_works = [work for work in found_works if work.get("title", "").strip().lower() == title]
+    if len(found_works) > 1:
+        raise RuntimeError(f"Multiple works found with the exact same title: {title}")
+    if found_works:
+        return found_works[0]
+    return None
+
+
+def _return_on_error(
+        link: str,
+        idx,
+        error: Optional[Exception] = None,
+        verbose: bool = True
+) -> dict:
     error = error or "Unknown Error"
     if verbose:
         print(f"Error fetching metadata for link {link}: {error}")
-    return {"PAPER_LINK": link, "Error": str(error)}
+    return {"idx": idx, "Error": str(error)}
 
 
 def _calculate_mncs(publications: pd.DataFrame) -> pd.Series:
     """
+    NOTE: to correctly calculate MNCS, field normalization is also required. This implementation only normalizes
+    within the small dataset provided, which may lead to misleading results if the dataset is not representative
+    of the broader field.
+    Hence, we decided to keep this function here for demonstration purposes, but not use it in the main analysis.
+
     The Mean Normalized Citation Score (MNCS) is the industry-standard metric for citation impact after normalizing for
     field and publication time (see https://open.leidenranking.com/information/indicators). It is calculated as the
     ratio between the actual number of citations received by a publication and the expected number of citations for
@@ -115,3 +146,10 @@ def _calculate_mncs(publications: pd.DataFrame) -> pd.Series:
     mncs = (non_retracted["TotalCitations"] / year_mean_citations).rename("MeanNormalizedCitationScore")
     mncs = mncs.reindex(publications.index, fill_value=pd.NA)
     return mncs
+
+
+def __coerce_string(row: pd.Series, col_name: str) -> str:
+    val = row.get(col_name, "")
+    if pd.isna(val):
+        return ""
+    return str(val).strip()

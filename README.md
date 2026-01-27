@@ -19,7 +19,7 @@ To investigate the citation benefits of sharing eye-movement data, we are conduc
 by Godwin et al. (2025). We extract citation counts from the [OpenAlex](https://openalex.org/) database, using their
 Python `pyalex` package.
 ### Analysis #1: Impact Metrics Comparisons
-We compare impact metrics (FWCI, MNCS) between articles that share eye-movement data and those
+We compare the `field weighted citation impact` (FWCI) between articles that share eye-movement data and those
 that do not; and also between different granularities of data-sharing (based on Godwin et al.'s coding scheme).
 ### Analysis #2: Regression Analysis
 We also attempt to quantify the benefits of sharing data by regressing citation counts on the time since publication,

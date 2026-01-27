@@ -39,13 +39,18 @@ godwin_subset = (
 # %%
 # Fetch Metadata from OpenAlex
 
-metadata = fetch_all_metadata(godwin_subset["PAPER_LINK"].tolist(), sleep_period=0.01, verbose=True)
+try:
+    metadata = pd.read_csv(os.path.join(os.getcwd(), "Godwin_2025_metadata.csv"), index_col=0)
+    print("Loaded previously fetched OpenAlex metadata from CSV.")
+except FileNotFoundError:
+    metadata = fetch_all_metadata(godwin, sleep_period=0.01, verbose=True)
+    metadata.to_csv(os.path.join(os.getcwd(), "Godwin_2025_metadata.csv"), index=True)
 
 # %%
 # Merge Datasets
 
 combined = (
-    metadata
+    pd.concat([metadata, godwin_subset], axis=1)
     .dropna(subset=["DOI"])     # drop entries with unsuccessful metadata fetch
     .merge(godwin_subset, on="PAPER_LINK")
     .drop_duplicates(subset="DOI")
@@ -53,8 +58,7 @@ combined = (
 )
 
 errors = (
-    metadata
-    .merge(godwin, on="PAPER_LINK")
+    pd.concat([metadata, godwin], axis=1)
     .loc[lambda df: df["Error"].notna()]
 )
 
@@ -82,15 +86,3 @@ topics_df = (
     .rename(columns={"index": "topic_id", "score": "total_score"})
     .assign(average_score=lambda df: df["total_score"] / df["count"])
 )
-
-
-# %%
-# TODO:
-## Find additional articles not in their dataset by:
-##  1) run the title+abstract query from Godwin et al. 2025 on OpenAlex
-##  2) run a Topic-based search of Works, from the topics identified above
-##  both searches should be filtered from 2017 onward to match Godwin et al (they included up to 2022)
-
-# TODO:
-## - Use these articles to calculate the actual MCNS/FWCI distributions for eye-tracking articles
-## - Evaluate the Godwin et al. dataset against these distributions

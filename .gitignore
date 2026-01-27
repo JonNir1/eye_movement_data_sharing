@@ -3,6 +3,7 @@
 # Ignore datasets
 *dataset*
 *database*
+*metadata*
 # Ignore Word docs
 *.docx
 *.doc

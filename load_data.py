@@ -12,8 +12,10 @@ def load_godwin2025(path: str = None) -> pd.DataFrame:
         raise FileNotFoundError(f"The specified database file does not exist: {path}")
     dataset = (
         pd.read_excel(path)
-        .dropna(subset=["PAPER_LINK"])
-        .drop_duplicates(subset=["PAPER_LINK"])
+        .assign(missing_link_and_title=lambda df: df["PAPER_LINK"].isna() & df["PAPER_TITLE"].isna())
+        .loc[lambda df: ~df["missing_link_and_title"]]
+        .drop(columns=["missing_link_and_title"])
+        .drop_duplicates(subset=["PAPER_LINK", "PAPER_TITLE"])
         .assign(data_sharing_class=lambda df: _assign_eyemovement_sharing_class(df))
     )
     dataset = dataset[dataset["PAPER_LINK"] != "UNPUBLISHED"]
