@@ -1,5 +1,5 @@
 # Ignore any Python files with 'secret' in the filename
-*secret*.py
+*secret*
 # Ignore datasets
 *dataset*
 *database*
