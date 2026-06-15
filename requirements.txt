@@ -1,0 +1,12 @@
+anyio
+numpy
+openpyxl
+pandas
+pingouin
+plotly
+pyalex
+requests
+scikit-posthocs
+scipy
+statsmodels
+tqdm
