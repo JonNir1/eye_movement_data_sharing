@@ -1,16 +1,19 @@
 # --- Project-specific ---
-# Python files with 'secret' in the filename (e.g. _api_secrets.py)
+# any files/direcotries with 'secret' in the filename (e.g. _api_secrets.py)
 *secret*
+
 # Datasets / cached metadata
 *dataset*
 *database*
 *metadata*
-# Word docs
+
+# Documents and images (article drafts, figures, etc.)
+*.pdf
 *.docx
 *.doc
-# Text files (scratch dumps/exports); keep requirements.txt tracked
 *.txt
 !requirements.txt
+*.png
 *.tmp
 
 # --- Python ---
