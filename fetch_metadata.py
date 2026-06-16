@@ -1,10 +1,11 @@
 import re
+import time
 from typing import Optional
 
 import requests
 import pyalex
 import pandas as pd
-from anyio import sleep
+from pyalex.api import QueryError
 from tqdm import tqdm
 
 from _api_secrets import *
@@ -25,12 +26,13 @@ def fetch_all_metadata(
     if sleep_period < 0:
         raise ValueError("sleep_period must be non-negative.")
     results = []
+    venue_cache = {}        # reuse Source-level summary_stats across articles from the same venue
     for _, article_row in tqdm(list(articles.iterrows()), disable=not verbose):
         link = __coerce_string(article_row, link_column)
         title = __coerce_string(article_row, title_column)
-        metadata = fetch_single_metadata(link, title, article_row.name, verbose=verbose)
+        metadata = fetch_single_metadata(link, title, article_row.name, venue_cache=venue_cache, verbose=verbose)
         results.append(metadata)
-        sleep(sleep_period)     # to respect rate limits of 100 requests per second
+        time.sleep(sleep_period)     # to respect rate limits of 100 requests per second
     results = (
         pd.DataFrame(results)
         .assign(
@@ -46,7 +48,8 @@ def fetch_all_metadata(
     return results
 
 
-def fetch_single_metadata(link: str, title: str, idx, verbose=True) -> dict:
+def fetch_single_metadata(link: str, title: str, idx, venue_cache: Optional[dict] = None, verbose=True) -> dict:
+    venue_cache = venue_cache if venue_cache is not None else {}
     result = dict()
     try:
         work = _fetch_work_by_doi_unsafe(link)
@@ -69,11 +72,83 @@ def fetch_single_metadata(link: str, title: str, idx, verbose=True) -> dict:
         result["FieldWeightedCitationIndex"] = work.get("fwci", pd.NA)
         result["IsRetracted"] = work.get("is_retracted")
         result["TotalCitations"] = work.get("cited_by_count")
+        result.update(_extract_covariates(work, venue_cache))
         for yr in work.get("counts_by_year", []):
             result[f"Citations{yr['year']}"] = yr["cited_by_count"]
         return result
     except Exception as e:
         return _return_on_error(link, idx, e, verbose)
+
+
+_COVARIATE_COLUMNS = ["NumAuthors", "HasUSAuthor", "IsOpenAccess",
+                      "VenueID", "VenueName", "Venue2yrMeanCitedness", "VenueHIndex", "VenueI10Index"]
+
+
+def fetch_covariates_by_id(
+        openalex_ids: pd.Series, sleep_period: float = 0.01, verbose: bool = True
+) -> pd.DataFrame:
+    """
+    Fetch author/open-access/venue covariates for already-known OpenAlex work IDs, returned as a
+    DataFrame indexed like ``openalex_ids``. Keying off the cached id (rather than re-matching by
+    link/title) guarantees the covariates describe the same work as previously-fetched citation data.
+    """
+    venue_cache = {}
+    records = []
+    for openalex_id in tqdm(openalex_ids, disable=not verbose):
+        if pd.isna(openalex_id):
+            records.append({})
+            continue
+        try:
+            work = pyalex.Works()[openalex_id]
+            records.append(_extract_covariates(work, venue_cache))
+        except (requests.exceptions.RequestException, QueryError) as e:
+            if verbose:
+                print(f"Error fetching covariates for {openalex_id}: {e}")
+            records.append({})
+        time.sleep(sleep_period)     # to respect rate limits of 100 requests per second
+    return pd.DataFrame(records, index=openalex_ids.index).reindex(columns=_COVARIATE_COLUMNS)
+
+
+def _extract_covariates(work: dict, venue_cache: dict) -> dict:
+    return {
+        "NumAuthors": len(work.get("authorships", [])),
+        "HasUSAuthor": _has_us_author(work),
+        "IsOpenAccess": (work.get("open_access") or {}).get("is_oa"),
+        **_fetch_venue_summary_stats(work, venue_cache),
+    }
+
+
+def _has_us_author(work: dict) -> bool:
+    for authorship in work.get("authorships", []):
+        if any(inst.get("country_code") == "US" for inst in authorship.get("institutions", [])):
+            return True
+        if "US" in (authorship.get("countries") or []):     # fallback when institutions are unresolved
+            return True
+    return False
+
+
+def _fetch_venue_summary_stats(work: dict, venue_cache: dict) -> dict:
+    empty = {"VenueID": pd.NA, "VenueName": pd.NA,
+             "Venue2yrMeanCitedness": pd.NA, "VenueHIndex": pd.NA, "VenueI10Index": pd.NA}
+    source = (work.get("primary_location") or {}).get("source") or {}
+    venue_url = source.get("id")
+    if not venue_url:
+        return empty
+    venue_id = venue_url.split("/")[-1]
+    if venue_id not in venue_cache:
+        # the work object carries the source id/name but not its citation summary; fetch it once per venue
+        try:
+            stats = pyalex.Sources()[venue_id].get("summary_stats") or {}
+        except (requests.exceptions.RequestException, QueryError, KeyError):
+            stats = {}
+        venue_cache[venue_id] = {
+            "VenueID": venue_id,
+            "VenueName": source.get("display_name"),
+            "Venue2yrMeanCitedness": stats.get("2yr_mean_citedness", pd.NA),
+            "VenueHIndex": stats.get("h_index", pd.NA),
+            "VenueI10Index": stats.get("i10_index", pd.NA),
+        }
+    return venue_cache[venue_id]
 
 
 def _fetch_work_by_doi_unsafe(text_with_doi: str) -> Optional[dict]:
