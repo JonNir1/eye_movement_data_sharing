@@ -7,7 +7,7 @@ import scikit_posthocs as sp
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from load_data import *
+from prepare_data import *
 from fetch_metadata import fetch_all_metadata
 
 # %%

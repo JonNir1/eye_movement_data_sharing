@@ -1,11 +1,27 @@
 import os
+from typing import Optional
 
+import re
 import pandas as pd
 
-from fetch_metadata import fetch_all_metadata
+from fetch_metadata import fetch_all_metadata, DOI_PATTERN
+
+_SHARING_CORRECTIONS = {
+    # articles with duplicate records in the original Godwin dataset are re-classified manually
+    "10.1038/s41598-018-37548-w": "FIXATION",
+    "10.3758/s13414-018-1579-7":  "FIXATION",
+    "10.3758/s13414-017-1328-3": "FIXATION",
+    "10.3758/s13414-017-1354-1": "FIXATION",
+    "10.1177/1747021820919351": "FIXATION",
+    "10.3758/s13414-021-02336-8": "TRIAL",
+    "10.3758/s13423-021-01920-1": "TRIAL",
+    "10.3758/s13423-021-01944-7": "PPT",
+}
 
 
-def prepare_analytical_dataset(godwin_path: str, metadata_path: str) -> pd.DataFrame:
+def prepare_analytical_dataset(
+        godwin_path: str, metadata_path: str, apply_corrections: bool = True
+) -> pd.DataFrame:
     godwin_dataset = load_godwin2025(godwin_path)
     metadata = _load_or_fetch_metadata(metadata_path, godwin_dataset)
     merged = (
@@ -17,6 +33,8 @@ def prepare_analytical_dataset(godwin_path: str, metadata_path: str) -> pd.DataF
             ]] == "YES").any(axis=1)
         )
     )
+    if apply_corrections:
+        merged = _correct_sharing_class(merged)
     return merged
 
 
@@ -55,6 +73,24 @@ def _load_or_fetch_metadata(path: str, godwin_dataset: pd.DataFrame) -> pd.DataF
     except FileNotFoundError:
         print("Fetching metadata from OpenAlex. This may take a few minutes...")
         metadata = fetch_all_metadata(godwin_dataset, sleep_period=0.01, verbose=True)
-        metadata.to_csv(os.path.join(os.getcwd(), "Godwin_2025_metadata.csv"), index=True)
+        metadata.to_csv(path, index=True)
     metadata["Pub2UpdateTime"] = pd.to_timedelta(metadata["Pub2UpdateTime"])    # validate casting
     return metadata
+
+
+def _correct_sharing_class(df: pd.DataFrame) -> pd.DataFrame:
+    def bare_doi(doi: Optional[str]) -> Optional[str]:
+        if pd.isnull(doi):
+            return doi
+        match = re.search(DOI_PATTERN, doi)
+        return match.group(1).lower() if match else None
+
+    sanitized_dois = df["DOI"].map(bare_doi)
+    missing = set(_SHARING_CORRECTIONS) - set(sanitized_dois.dropna())
+    if missing:
+        raise ValueError(f"Correction DOIs not found in the dataset: {sorted(missing)}")
+    hand_picked_class = sanitized_dois.map(_SHARING_CORRECTIONS)
+    # apply the re-classification:
+    new_df = df.copy()      # avoid SettingWithCopy warnings
+    new_df["data_sharing_class"] = hand_picked_class.fillna(df["data_sharing_class"])
+    return new_df

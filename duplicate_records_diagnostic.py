@@ -21,7 +21,7 @@ from typing import Optional
 
 import pandas as pd
 
-from load_data import load_godwin2025
+from prepare_data import load_godwin2025
 
 
 def find_duplicate_doi_records(
