@@ -1,5 +1,5 @@
 import re
-from typing import List, Optional
+from typing import Optional
 
 import requests
 import pyalex
@@ -12,7 +12,7 @@ from _api_secrets import *
 
 pyalex.config.email = EMAIL
 pyalex.config.api_key = OPENALEX_API_KEY
-_DOI_PATTERN = r'(10\.\d{4,9}/[-._;()/:a-zA-Z0-9]+)'
+DOI_PATTERN = r'(10\.\d{4,9}/[-._;()/:a-zA-Z0-9]+)'
 
 
 def fetch_all_metadata(
@@ -77,7 +77,7 @@ def fetch_single_metadata(link: str, title: str, idx, verbose=True) -> dict:
 
 
 def _fetch_work_by_doi_unsafe(text_with_doi: str) -> Optional[dict]:
-    doi_match = re.search(_DOI_PATTERN, text_with_doi)
+    doi_match = re.search(DOI_PATTERN, text_with_doi)
     if doi_match:
         found_doi = doi_match.group(1)
         work = pyalex.Works()[f"doi:{found_doi}"]
