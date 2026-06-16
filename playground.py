@@ -52,7 +52,6 @@ except FileNotFoundError:
 combined = (
     pd.concat([metadata, godwin_subset], axis=1)
     .dropna(subset=["DOI"])     # drop entries with unsuccessful metadata fetch
-    .merge(godwin_subset, on="PAPER_LINK")
     .drop_duplicates(subset="DOI")
     .loc[lambda df: df["IsRetracted"] == False]   # drop retracted articles
 )
