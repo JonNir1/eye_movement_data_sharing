@@ -80,8 +80,13 @@ def fetch_single_metadata(link: str, title: str, idx, venue_cache: Optional[dict
         return _return_on_error(link, idx, e, verbose)
 
 
-_COVARIATE_COLUMNS = ["NumAuthors", "HasUSAuthor", "IsOpenAccess",
+_COVARIATE_COLUMNS = ["NumAuthors", "HasUSAuthor", "IsOpenAccess", "HasPreprint", "PreprintSources",
                       "VenueID", "VenueName", "Venue2yrMeanCitedness", "VenueHIndex", "VenueI10Index"]
+
+# Substrings (matched against a repository source's display_name) that mark a genuine preprint server.
+# Deliberately excludes green-OA repositories (PubMed Central, institutional repos, DOAJ, Zenodo, Figshare).
+# "rxiv" covers arXiv / bioRxiv / medRxiv / PsyArXiv / SocArXiv / ChemRxiv / TechRxiv / EngrXiv.
+_PREPRINT_SERVER_KEYWORDS = ("rxiv", "preprint", "research square", "ssrn")
 
 
 def fetch_covariates_by_id(
@@ -114,8 +119,60 @@ def _extract_covariates(work: dict, venue_cache: dict) -> dict:
         "NumAuthors": len(work.get("authorships", [])),
         "HasUSAuthor": _has_us_author(work),
         "IsOpenAccess": (work.get("open_access") or {}).get("is_oa"),
+        **_detect_preprint(work),
         **_fetch_venue_summary_stats(work, venue_cache),
     }
+
+
+def _detect_preprint(work: dict) -> dict:
+    """
+    Flag whether a work was ever preprinted, unioning two independent (and individually incomplete)
+    signals: an OpenAlex preprint-server location and a Crossref ``has-preprint`` relation. The two
+    barely overlap, so the union materially reduces the undercount. PreprintSources records which
+    signal(s) fired, for auditing.
+    """
+    openalex_server = _openalex_preprint_server(work)
+    crossref_preprint = _crossref_has_preprint(work.get("doi"))
+    sources = []
+    if openalex_server:
+        sources.append(f"openalex:{openalex_server}")
+    if crossref_preprint:
+        sources.append("crossref")
+    return {
+        "HasPreprint": bool(openalex_server) or crossref_preprint,
+        "PreprintSources": ";".join(sources) if sources else pd.NA,
+    }
+
+
+def _openalex_preprint_server(work: dict) -> Optional[str]:
+    """Return the display name of a recognised preprint server among the work's repository
+    locations (excluding green-OA repositories), or None."""
+    for location in work.get("locations", []) or []:
+        source = location.get("source") or {}
+        if source.get("type") != "repository":
+            continue
+        name = source.get("display_name") or ""
+        if any(keyword in name.lower() for keyword in _PREPRINT_SERVER_KEYWORDS):
+            return name
+    return None
+
+
+def _crossref_has_preprint(doi: Optional[str]) -> bool:
+    """Whether Crossref records a ``has-preprint`` relation for this DOI (publisher-deposited)."""
+    if not doi:
+        return False
+    doi_match = re.search(DOI_PATTERN, doi)
+    if not doi_match:
+        return False
+    try:
+        resp = requests.get(f"https://api.crossref.org/works/{doi_match.group(1)}",
+                            params={"mailto": EMAIL}, timeout=20)
+        if resp.status_code != 200:
+            return False
+        relation = resp.json().get("message", {}).get("relation", {}) or {}
+        return bool(relation.get("has-preprint"))
+    except (requests.exceptions.RequestException, ValueError):
+        return False
 
 
 def _has_us_author(work: dict) -> bool:
