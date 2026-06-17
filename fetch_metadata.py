@@ -80,8 +80,13 @@ def fetch_single_metadata(link: str, title: str, idx, venue_cache: Optional[dict
         return _return_on_error(link, idx, e, verbose)
 
 
-_COVARIATE_COLUMNS = ["NumAuthors", "HasUSAuthor", "IsOpenAccess",
+_COVARIATE_COLUMNS = ["NumAuthors", "HasUSAuthor", "IsOpenAccess", "HasPreprint", "PreprintServer",
                       "VenueID", "VenueName", "Venue2yrMeanCitedness", "VenueHIndex", "VenueI10Index"]
+
+# Substrings (matched against a repository source's display_name) that mark a genuine preprint server.
+# Deliberately excludes green-OA repositories (PubMed Central, institutional repos, DOAJ, Zenodo, Figshare).
+# "rxiv" covers arXiv / bioRxiv / medRxiv / PsyArXiv / SocArXiv / ChemRxiv / TechRxiv / EngrXiv.
+_PREPRINT_SERVER_KEYWORDS = ("rxiv", "preprint", "research square", "ssrn")
 
 
 def fetch_covariates_by_id(
@@ -114,8 +119,25 @@ def _extract_covariates(work: dict, venue_cache: dict) -> dict:
         "NumAuthors": len(work.get("authorships", [])),
         "HasUSAuthor": _has_us_author(work),
         "IsOpenAccess": (work.get("open_access") or {}).get("is_oa"),
+        **_detect_preprint(work),
         **_fetch_venue_summary_stats(work, venue_cache),
     }
+
+
+def _detect_preprint(work: dict) -> dict:
+    """
+    Detect whether a work has a copy on a recognised preprint server (as opposed to a green-OA
+    repository), by scanning its locations. Returns the matched server name for auditing. Note this
+    relies on OpenAlex's (incomplete) preprint<->publication linking, so it undercounts.
+    """
+    for location in work.get("locations", []) or []:
+        source = location.get("source") or {}
+        if source.get("type") != "repository":
+            continue
+        name = source.get("display_name") or ""
+        if any(keyword in name.lower() for keyword in _PREPRINT_SERVER_KEYWORDS):
+            return {"HasPreprint": True, "PreprintServer": name}
+    return {"HasPreprint": False, "PreprintServer": pd.NA}
 
 
 def _has_us_author(work: dict) -> bool:
