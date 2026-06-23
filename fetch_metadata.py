@@ -88,6 +88,14 @@ _COVARIATE_COLUMNS = ["NumAuthors", "HasUSAuthor", "IsOpenAccess", "HasPreprint"
 # "rxiv" covers arXiv / bioRxiv / medRxiv / PsyArXiv / SocArXiv / ChemRxiv / TechRxiv / EngrXiv.
 _PREPRINT_SERVER_KEYWORDS = ("rxiv", "preprint", "research square", "ssrn")
 
+# OpenAlex work ids of articles manually confirmed to have a preprint via title+author+year search.
+# These were retitled between preprint and publication, so neither OpenAlex locations nor Crossref
+# relations linked them; matches were verified on full author list and publication-year ordering.
+_CONFIRMED_PREPRINTS = {
+    "W3126793843", "W3154689434", "W2795516647", "W4225688097",
+    "W3160619806", "W3168479376", "W2963765204", "W3126301271",
+}
+
 
 def fetch_covariates_by_id(
         openalex_ids: pd.Series, sleep_period: float = 0.01, verbose: bool = True
@@ -133,13 +141,16 @@ def _detect_preprint(work: dict) -> dict:
     """
     openalex_server = _openalex_preprint_server(work)
     crossref_preprint = _crossref_has_preprint(work.get("doi"))
+    confirmed = (work.get("id") or "").split("/")[-1] in _CONFIRMED_PREPRINTS
     sources = []
     if openalex_server:
         sources.append(f"openalex:{openalex_server}")
     if crossref_preprint:
         sources.append("crossref")
+    if confirmed:
+        sources.append("titlesearch")
     return {
-        "HasPreprint": bool(openalex_server) or crossref_preprint,
+        "HasPreprint": bool(openalex_server) or crossref_preprint or confirmed,
         "PreprintSources": ";".join(sources) if sources else pd.NA,
     }
 
