@@ -80,8 +80,10 @@ def fetch_single_metadata(link: str, title: str, idx, venue_cache: Optional[dict
         return _return_on_error(link, idx, e, verbose)
 
 
-_COVARIATE_COLUMNS = ["NumAuthors", "HasUSAuthor", "IsOpenAccess", "HasPreprint", "PreprintSources",
-                      "VenueID", "VenueName", "Venue2yrMeanCitedness", "VenueHIndex", "VenueI10Index"]
+_COVARIATE_COLUMNS = [
+    "NumAuthors", "HasUSAuthor", "IsOpenAccess", "HasPreprint", "PreprintSources",
+    "VenueID", "VenueName", "Venue2yrMeanCitedness", "VenueHIndex", "VenueI10Index"
+]
 
 # Substrings (matched against a repository source's display_name) that mark a genuine preprint server.
 # Deliberately excludes green-OA repositories (PubMed Central, institutional repos, DOAJ, Zenodo, Figshare).
@@ -123,10 +125,11 @@ def fetch_covariates_by_id(
 
 
 def _extract_covariates(work: dict, venue_cache: dict) -> dict:
+    is_open_access = (work.get("open_access") or {}).get("is_oa")
     return {
+        "IsOpenAccess": is_open_access,
         "NumAuthors": len(work.get("authorships", [])),
         "HasUSAuthor": _has_us_author(work),
-        "IsOpenAccess": (work.get("open_access") or {}).get("is_oa"),
         **_detect_preprint(work),
         **_fetch_venue_summary_stats(work, venue_cache),
     }
