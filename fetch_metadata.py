@@ -147,7 +147,7 @@ def _extract_authorship_covariates(authorships: list) -> dict:
         if "US" in (authorship.get("countries") or []):     # fallback when institutions are unresolved
             has_us_author = True
     return {
-        "Authors": authors,
+        "Authors": "; ".join(name for name in authors if name),     # Godwin convention: "Surname, II; ..."
         "NumAuthors": len(authorships),
         "HasUSAuthor": has_us_author,
     }
@@ -165,7 +165,7 @@ def _format_author_name(author: dict) -> str:
         split -= 1
     surname = " ".join(tokens[split:])
     initials = "".join(token[0].upper() for token in tokens[:split] if token[:1].isalpha())
-    return f"{surname}; {initials}" if initials else surname
+    return f"{surname}, {initials}" if initials else surname
 
 
 def _detect_preprint(work: dict) -> dict:
