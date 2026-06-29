@@ -125,13 +125,28 @@ def fetch_covariates_by_id(
 
 
 def _extract_covariates(work: dict, venue_cache: dict) -> dict:
-    is_open_access = (work.get("open_access") or {}).get("is_oa")
     return {
-        "IsOpenAccess": is_open_access,
-        "NumAuthors": len(work.get("authorships", [])),
-        "HasUSAuthor": _has_us_author(work),
+        "IsOpenAccess": (work.get("open_access") or {}).get("is_oa"),
+        **_extract_authorship_covariates(work.get("authorships", [])),
         **_detect_preprint(work),
         **_fetch_venue_summary_stats(work, venue_cache),
+    }
+
+
+def _extract_authorship_covariates(authorships: list) -> dict:
+    authors = []
+    has_us_author = False
+    for authorship in authorships:
+        author_id = (authorship.get("author", {})).get("id")
+        # TODO: extract author name (e.g. `Nir, J.`)
+        if any(inst.get("country_code") == "US" for inst in authorship.get("institutions", [])):
+            has_us_author = True
+        if "US" in (authorship.get("countries") or []):     # fallback when institutions are unresolved
+            has_us_author = True
+    return {
+        "Authors": authors,
+        "NumAuthors": len(authors),
+        "HasUSAuthor": has_us_author,
     }
 
 
@@ -187,15 +202,6 @@ def _crossref_has_preprint(doi: Optional[str]) -> bool:
         return bool(relation.get("has-preprint"))
     except (requests.exceptions.RequestException, ValueError):
         return False
-
-
-def _has_us_author(work: dict) -> bool:
-    for authorship in work.get("authorships", []):
-        if any(inst.get("country_code") == "US" for inst in authorship.get("institutions", [])):
-            return True
-        if "US" in (authorship.get("countries") or []):     # fallback when institutions are unresolved
-            return True
-    return False
 
 
 def _fetch_venue_summary_stats(work: dict, venue_cache: dict) -> dict:
