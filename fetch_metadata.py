@@ -165,7 +165,7 @@ def _format_author_name(author: dict) -> str:
         split -= 1
     surname = " ".join(tokens[split:])
     initials = "".join(token[0].upper() for token in tokens[:split] if token[:1].isalpha())
-    return f"{surname}, {initials}" if initials else surname
+    return f"{surname}; {initials}" if initials else surname
 
 
 def _detect_preprint(work: dict) -> dict:
