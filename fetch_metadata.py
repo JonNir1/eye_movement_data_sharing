@@ -145,7 +145,7 @@ def _extract_authorship_covariates(authorships: list) -> dict:
             has_us_author = True
     return {
         "Authors": authors,
-        "NumAuthors": len(authors),
+        "NumAuthors": len(authors),     # TODO: make sure num authors matches len(authorships)
         "HasUSAuthor": has_us_author,
     }
 
