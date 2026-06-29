@@ -81,9 +81,13 @@ def fetch_single_metadata(link: str, title: str, idx, venue_cache: Optional[dict
 
 
 _COVARIATE_COLUMNS = [
-    "NumAuthors", "HasUSAuthor", "IsOpenAccess", "HasPreprint", "PreprintSources",
+    "Authors", "NumAuthors", "HasUSAuthor", "IsOpenAccess", "HasPreprint", "PreprintSources",
     "VenueID", "VenueName", "Venue2yrMeanCitedness", "VenueHIndex", "VenueI10Index"
 ]
+
+# Lowercase surname particles kept attached to the family name (e.g. "van der Stigchel").
+_NAME_PARTICLES = {"van", "von", "de", "den", "der", "del", "della", "di", "da", "du",
+                   "la", "le", "el", "bin", "ibn", "al", "ten", "ter", "op"}
 
 # Substrings (matched against a repository source's display_name) that mark a genuine preprint server.
 # Deliberately excludes green-OA repositories (PubMed Central, institutional repos, DOAJ, Zenodo, Figshare).
@@ -137,17 +141,31 @@ def _extract_authorship_covariates(authorships: list) -> dict:
     authors = []
     has_us_author = False
     for authorship in authorships:
-        author_id = (authorship.get("author", {})).get("id")
-        # TODO: extract author name (e.g. `Nir, J.`)
+        authors.append(_format_author_name(authorship.get("author") or {}))
         if any(inst.get("country_code") == "US" for inst in authorship.get("institutions", [])):
             has_us_author = True
         if "US" in (authorship.get("countries") or []):     # fallback when institutions are unresolved
             has_us_author = True
     return {
         "Authors": authors,
-        "NumAuthors": len(authors),     # TODO: make sure num authors matches len(authorships)
+        "NumAuthors": len(authorships),     # one entry appended per authorship, so this matches len(authors)
         "HasUSAuthor": has_us_author,
     }
+
+
+def _format_author_name(author: dict) -> str:
+    """Format an OpenAlex author's display name as 'Surname, Initials' (e.g. 'Nir, J'), to mirror the
+    Godwin author records so the two sources can be compared. Trailing lowercase particles are kept
+    with the surname (e.g. 'van der Stigchel, R')."""
+    tokens = (author.get("display_name") or "").split()
+    if not tokens:
+        return ""
+    split = len(tokens) - 1
+    while split > 0 and tokens[split - 1].lower() in _NAME_PARTICLES:
+        split -= 1
+    surname = " ".join(tokens[split:])
+    initials = "".join(token[0].upper() for token in tokens[:split] if token[:1].isalpha())
+    return f"{surname}, {initials}" if initials else surname
 
 
 def _detect_preprint(work: dict) -> dict:
