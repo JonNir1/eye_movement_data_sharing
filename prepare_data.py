@@ -15,7 +15,7 @@ _SHARING_CORRECTIONS = {
     "10.1177/1747021820919351": "FIXATION",
     "10.3758/s13414-021-02336-8": "TRIAL",
     "10.3758/s13423-021-01920-1": "TRIAL",
-    "10.3758/s13423-021-01944-7": "PPT",
+    "10.3758/s13423-021-01944-7": "PARTICIPANT",
 }
 
 
@@ -60,7 +60,7 @@ def load_godwin2025(path: str = None) -> pd.DataFrame:
 def _assign_eyemovement_sharing_class(df: pd.DataFrame) -> pd.Series:
     sharing_class = pd.Series("NONE", index=df.index, dtype="string").rename("data_sharing_class")
     # specify data from coarse to finest to overwrite when article shares more fine-grained data
-    sharing_class[df["BY_PPT"] == "YES"] = "PPT"
+    sharing_class[df["BY_PPT"] == "YES"] = "PARTICIPANT"
     sharing_class[df["BY_TRIAL"] == "YES"] = "TRIAL"
     sharing_class[df["BY_FIXATION"] == "YES"] = "FIXATION"
     return sharing_class
