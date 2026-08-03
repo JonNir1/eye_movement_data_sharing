@@ -1,7 +1,7 @@
 # Citation Benefits in Eye-Movement Data Sharing
 
 ## Background
-Godwin et al. (2025) conducted a comprehensive survey of articles published between 2015 and 2024 that reported
+Godwin et al. (2025) conducted a comprehensive survey of articles published between 2017 and 2022 that reported
 eye-movement data. Their analysis revealed that researchers often share processed data that enables verification
 of statistical results (_analytic reproducibility_), they rarely share the raw eye-movement data or experimental
 materials required for _direct replication_ and _secondary analysis_.<br>
