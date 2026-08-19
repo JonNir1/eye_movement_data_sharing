@@ -6,8 +6,11 @@
 *dataset*
 *database*
 *metadata*
-# ...but notebooks are code, even when named after the data they load
+# ...but these are code, even though they are named after the data they load.
+# Negations are listed explicitly: a blanket `!*.py` would also un-ignore
+# `_api_secrets.py`, since the last matching pattern wins.
 !*.ipynb
+!analysis/helpers/dataset.py
 
 # Documents and images (article drafts, figures, etc.)
 *.pdf
