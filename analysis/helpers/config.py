@@ -10,12 +10,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 OUTPUT_DIR = PROJECT_ROOT / "output"
 
-# `.cache/` holds both the derived parquet frames *and* the source data they are built from:
-# the Godwin corpus and the frozen OpenAlex snapshot. Neither source file is reproducible from
-# this repo (both are gitignored), so the directory is not safe to delete wholesale.
-CACHE_DIR = PROJECT_ROOT / ".cache"
-GODWIN_PATH = CACHE_DIR / "Godwin_2025_dataset.xlsx"
-METADATA_PATH = CACHE_DIR / "Godwin_2025_metadata.csv"
+# `data_store/` holds both the derived parquet frames *and* the source data they are built
+# from: the Godwin corpus and the frozen OpenAlex snapshot. Neither source file is reproducible
+# from this repo (both are gitignored), so the directory is NOT safe to delete wholesale - to
+# force a rebuild, remove only the *.parquet files, or call `load_or_build(rebuild=True)`.
+DATA_STORE_DIR = PROJECT_ROOT / "data_store"
+GODWIN_PATH = DATA_STORE_DIR / "Godwin_2025_dataset.xlsx"
+METADATA_PATH = DATA_STORE_DIR / "Godwin_2025_metadata.csv"
 
 FONT_FAMILY = "sans-serif"
 TITLE_FONT = dict(family=FONT_FAMILY, size=20, color="black")
