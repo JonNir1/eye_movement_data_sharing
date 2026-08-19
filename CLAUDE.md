@@ -13,6 +13,32 @@ bibliometric indicators from OpenAlex.
 The manuscript itself lives one directory up from the repo (`brief report.docx` is the
 current in-progress revision; `brief report.pdf` is the version that was submitted).
 
+## Repository layout
+
+```
+data/       acquisition only - OpenAlex/CrossRef fetching, and _api_secrets.py
+analysis/   five notebooks, one per research question, plus helpers/
+output/     exported figures
+.cache/     derived parquet cache (gitignored, regenerated on demand)
+```
+
+The notebooks are numbered but independent — each calls `helpers.dataset.load_or_build()`
+and runs from a cold kernel. The parquet cache is an optimization, never a dependency
+between notebooks.
+
+| Notebook | Question |
+|---|---|
+| `01_dataset_and_descriptives` | What is the corpus, and does it match Godwin et al.? |
+| `02_sharing_and_article_features` | Is sharing associated with other article characteristics? |
+| `03_citation_counts` | Do sharing articles accrue more raw citations? |
+| `04_citation_dynamics` | When does the advantage appear, and does it persist? |
+| `05_fwci` | Do sharing articles score higher on field-weighted impact? |
+
+`analysis/helpers/` holds only code that two or more notebooks import (`config`, `dataset`,
+`stats`, `plotting`). Single-notebook helpers stay inline on purpose. There is no
+`__init__.py` anywhere — these are namespace packages, and helper modules use absolute
+imports (`from helpers.config import ...`).
+
 ## Environment
 
 Use the project venv — the system Python does not have the required packages:
@@ -22,6 +48,17 @@ Use the project venv — the system Python does not have the required packages:
 ```
 
 Python 3.14. Dependencies in `requirements.txt`.
+
+Run notebooks with `analysis/` as the working directory, so `helpers` resolves.
+
+**`Godwin_2025_metadata.csv` is a frozen OpenAlex snapshot and is gitignored.** Every reported
+number depends on it. `prepare_data._load_or_fetch_metadata()` will silently re-query OpenAlex
+and write a *new* snapshot if the file is missing, so `helpers.dataset` refuses to run without
+it rather than regenerating it. If it is ever lost, restore it from a backup or another
+checkout — do not let it rebuild.
+
+Analysis code does not need API credentials: `helpers.dataset` imports the acquisition layer
+lazily, so a warm cache runs with no `_api_secrets.py` present at all.
 
 ## Sample construction
 
