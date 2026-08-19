@@ -5,6 +5,7 @@ pandas
 pingouin
 plotly
 pyalex
+pyarrow
 requests
 scikit-posthocs
 scipy
