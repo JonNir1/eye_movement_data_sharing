@@ -19,8 +19,13 @@ current in-progress revision; `brief report.pdf` is the version that was submitt
 data/       acquisition only - OpenAlex/CrossRef fetching, and _api_secrets.py
 analysis/   five notebooks, one per research question, plus helpers/
 output/     exported figures
-.cache/     derived parquet cache (gitignored, regenerated on demand)
+.cache/     source data AND the derived parquet frames (gitignored)
 ```
+
+**`.cache/` is not safe to delete.** Despite the name it holds the two irreplaceable source
+files - `Godwin_2025_dataset.xlsx` and the frozen `Godwin_2025_metadata.csv` - alongside the
+regenerable `*.parquet` frames. To force a rebuild, delete only the parquet files, or call
+`load_or_build(rebuild=True)`.
 
 The notebooks are numbered but independent — each calls `helpers.dataset.load_or_build()`
 and runs from a cold kernel. The parquet cache is an optimization, never a dependency
@@ -51,11 +56,14 @@ Python 3.14. Dependencies in `requirements.txt`.
 
 Run notebooks with `analysis/` as the working directory, so `helpers` resolves.
 
-**`Godwin_2025_metadata.csv` is a frozen OpenAlex snapshot and is gitignored.** Every reported
-number depends on it. `prepare_data._load_or_fetch_metadata()` will silently re-query OpenAlex
-and write a *new* snapshot if the file is missing, so `helpers.dataset` refuses to run without
-it rather than regenerating it. If it is ever lost, restore it from a backup or another
-checkout — do not let it rebuild.
+Figure exports are individually gated behind `if False:` blocks calling `save_figure()`; flip the one figure you want to re-export.
+
+**`.cache/Godwin_2025_metadata.csv` is a frozen OpenAlex snapshot and is gitignored.** Every
+reported number depends on it. `prepare_data._load_or_fetch_metadata()` will silently re-query
+OpenAlex and write a *new* snapshot if the file is missing, so `helpers.dataset` refuses to run
+without it rather than regenerating it. If it is ever lost, restore it from a backup or another
+checkout — do not let it rebuild. (`Godwin_2025_metadata.backup.csv` sits in the same directory,
+so a wholesale `.cache/` delete would take the backup with it.)
 
 Analysis code does not need API credentials: `helpers.dataset` imports the acquisition layer
 lazily, so a warm cache runs with no `_api_secrets.py` present at all.
