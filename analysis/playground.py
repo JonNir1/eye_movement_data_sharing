@@ -7,6 +7,11 @@ import scikit_posthocs as sp
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+# the acquisition modules live in `data/`, which is not a sibling of this file
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "data"))
+
 from prepare_data import *
 from fetch_metadata import fetch_all_metadata
 
