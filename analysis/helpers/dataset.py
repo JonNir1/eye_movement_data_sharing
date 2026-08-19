@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 
 from helpers.config import (
-    CACHE_DIR, GODWIN_PATH, METADATA_PATH, PROJECT_ROOT,
+    DATA_STORE_DIR, GODWIN_PATH, METADATA_PATH, PROJECT_ROOT,
     SHARING_CLASS_ORDER, VENUE_IMPACT_METRIC,
 )
 
@@ -34,10 +34,12 @@ def _prepare_analytical_dataset():
     from prepare_data import prepare_analytical_dataset
     return prepare_analytical_dataset
 
+
+# the parquet frames are the regenerable part of the data store
 _CACHE_FILES = {
-    "combined": CACHE_DIR / "combined.parquet",
-    "features": CACHE_DIR / "features.parquet",
-    "citations": CACHE_DIR / "citations.parquet",
+    "combined": DATA_STORE_DIR / "combined.parquet",
+    "features": DATA_STORE_DIR / "features.parquet",
+    "citations": DATA_STORE_DIR / "citations.parquet",
 }
 _SOURCES = (GODWIN_PATH, METADATA_PATH, _DATA_DIR / "prepare_data.py")
 
@@ -160,7 +162,7 @@ def load_or_build(
             frames = {name: pd.read_parquet(path) for name, path in _CACHE_FILES.items()}
             _warn_if_stale()
             if verbose:
-                print(f"Loaded cached dataset from {CACHE_DIR} ({len(frames['combined'])} rows)")
+                print(f"Loaded cached dataset from {DATA_STORE_DIR} ({len(frames['combined'])} rows)")
             return frames["combined"], frames["features"], frames["citations"]
         except Exception as err:
             print(f"Cache unreadable ({err.__class__.__name__}: {err}); rebuilding from source.")
@@ -169,13 +171,13 @@ def load_or_build(
     features_df = build_feature_matrix(combined)
     citations_df = build_citations_frame(combined, features_df)
 
-    CACHE_DIR.mkdir(exist_ok=True)
+    DATA_STORE_DIR.mkdir(exist_ok=True)
     try:
         combined.to_parquet(_CACHE_FILES["combined"])
         features_df.to_parquet(_CACHE_FILES["features"])
         citations_df.to_parquet(_CACHE_FILES["citations"])
         if verbose:
-            print(f"Wrote dataset cache to {CACHE_DIR}")
+            print(f"Wrote dataset cache to {DATA_STORE_DIR}")
     except Exception as err:
         print(f"Could not write cache ({err.__class__.__name__}: {err}); continuing without it.")
     return combined, features_df, citations_df
