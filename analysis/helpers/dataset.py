@@ -16,13 +16,23 @@ from helpers.config import (
     SHARING_CLASS_ORDER, VENUE_IMPACT_METRIC,
 )
 
-# `data/prepare_data.py` and `data/fetch_metadata.py` import each other as siblings, so the
-# `data/` directory itself (not the project root) is what has to be importable.
 _DATA_DIR = PROJECT_ROOT / "data"
-if str(_DATA_DIR) not in sys.path:
-    sys.path.insert(0, str(_DATA_DIR))
 
-from prepare_data import prepare_analytical_dataset  # noqa: E402
+
+def _prepare_analytical_dataset():
+    """Import the acquisition layer lazily, and only when we actually have to rebuild.
+
+    `data/fetch_metadata.py` reads API credentials from `_api_secrets` at *import* time, so a
+    module-level import here would make every notebook require credentials it never uses. Kept
+    lazy, a warm parquet cache lets the whole analysis run with no credentials present at all.
+
+    `prepare_data.py` and `fetch_metadata.py` import each other as siblings, so `data/` itself
+    (not the project root) is what has to be importable.
+    """
+    if str(_DATA_DIR) not in sys.path:
+        sys.path.insert(0, str(_DATA_DIR))
+    from prepare_data import prepare_analytical_dataset
+    return prepare_analytical_dataset
 
 _CACHE_FILES = {
     "combined": CACHE_DIR / "combined.parquet",
@@ -32,13 +42,33 @@ _CACHE_FILES = {
 _SOURCES = (GODWIN_PATH, METADATA_PATH, _DATA_DIR / "prepare_data.py")
 
 
+def _require_frozen_metadata() -> None:
+    """Refuse to run the analysis when the frozen OpenAlex snapshot is missing.
+
+    `prepare_data._load_or_fetch_metadata()` re-queries OpenAlex and writes a fresh CSV when it
+    cannot find one. That is the right behaviour for acquisition, but not here: citation counts
+    and FWCI move over time, so a silent re-fetch would quietly replace the frozen snapshot the
+    manuscript reports and change every number downstream. Fail loudly instead.
+    """
+    if METADATA_PATH.exists():
+        return
+    raise FileNotFoundError(
+        f"Frozen OpenAlex metadata not found at {METADATA_PATH}. "
+        "Refusing to continue: building it from scratch would re-query OpenAlex and produce a "
+        "NEW snapshot with today's citation counts, which would not reproduce the reported "
+        "results. Restore the file (it is gitignored, so copy it from another checkout) rather "
+        "than letting it be regenerated."
+    )
+
+
 def build_merged() -> pd.DataFrame:
     """The Godwin corpus joined to OpenAlex metadata, *before* any exclusion criteria.
 
     Notebook 01 needs this to quantify how many records each criterion removes, and to compare
     the Godwin and OpenAlex publication years on records the year filter would otherwise drop.
     """
-    return prepare_analytical_dataset(
+    _require_frozen_metadata()
+    return _prepare_analytical_dataset()(
         godwin_path=str(GODWIN_PATH), metadata_path=str(METADATA_PATH), apply_corrections=True
     )
 
