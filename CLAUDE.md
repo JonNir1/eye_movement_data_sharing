@@ -54,7 +54,10 @@ Use the project venv — the system Python does not have the required packages:
 
 Python 3.14. Dependencies in `requirements.txt`.
 
-Run notebooks with `analysis/` as the working directory, so `helpers` resolves.
+**Run notebooks with `analysis/` as the working directory.** The Jupyter kernel puts the
+notebook's own directory first on `sys.path`, which is the whole reason `from helpers
+import ...` resolves with no path setup in the notebooks. Note this puts `analysis/` on
+the path, not the project root, so `from analysis.helpers import ...` does *not* work.
 
 Figure exports are individually gated behind `if False:` blocks calling `save_figure()`; flip the one figure you want to re-export.
 
