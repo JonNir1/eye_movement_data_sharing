@@ -6,6 +6,7 @@ pingouin
 plotly
 pyalex
 pyarrow
+pytest
 requests
 scikit-posthocs
 scipy

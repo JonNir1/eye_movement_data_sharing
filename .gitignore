@@ -11,6 +11,7 @@
 # `_api_secrets.py`, since the last matching pattern wins.
 !*.ipynb
 !analysis/helpers/dataset.py
+!tests/test_*.py
 
 # Documents and images (article drafts, figures, etc.)
 *.pdf
