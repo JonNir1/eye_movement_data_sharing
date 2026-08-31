@@ -5,6 +5,7 @@ notebooks have run before it, so each notebook is independently runnable from a 
 the parquet cache is purely a speed optimization, never a dependency between notebooks.
 """
 
+import re
 import sys
 from typing import Tuple
 
@@ -42,6 +43,7 @@ _CACHE_FILES = {
     "citations": DATA_STORE_DIR / "citations.parquet",
 }
 _SOURCES = (GODWIN_PATH, METADATA_PATH, _DATA_DIR / "prepare_data.py")
+_CITATION_COL_PATTERN = re.compile(r"Citations\d{4}")
 
 
 def _require_frozen_metadata() -> None:
@@ -181,3 +183,71 @@ def load_or_build(
     except Exception as err:
         print(f"Could not write cache ({err.__class__.__name__}: {err}); continuing without it.")
     return combined, features_df, citations_df
+
+
+def citations_since_publication(
+        articles: pd.DataFrame,
+        cumulative: bool = False,
+        include_publication_year: bool = True,
+) -> pd.DataFrame:
+    """Re-index the per-calendar-year citation counts by years *since* each article's publication.
+
+    OpenAlex stores citations in absolute calendar years (`Citations2017`, `Citations2018`, ...),
+    which are not comparable across articles published in different years. This converts them to
+    columns `year_0`, `year_1`, ... where `year_0` is the article's own publication year, `year_1`
+    the following calendar year, and so on.
+
+    :param articles: frame indexed by article, carrying the `Citations20XX` columns and
+        `PublicationYear`.
+    :param cumulative: if True, each column is the running total up to and including that year, so
+        `year_1` is the sum of `year_0` and `year_1`. If False (default), each column holds only
+        that year's own citations.
+    :param include_publication_year: if False, `year_0` is dropped *before* anything else happens,
+        so the result starts at `year_1` and, when `cumulative` is set, the running total starts
+        fresh from `year_1` rather than carrying the publication year forward.
+    :return: frame with the same index as `articles` and one `year_k` column per observed offset.
+
+    A missing `Citations20XX` cell means the article was not cited that year, not that the count is
+    unknown - OpenAlex simply omits empty years - so those are read as zero. Offsets that fall
+    outside the calendar range OpenAlex reports for an article (a year that has not happened yet)
+    have no cell at all and stay NaN, which keeps "not cited" distinct from "not yet observed".
+
+    Citations dated to a calendar year *before* the publication year have no meaningful offset and
+    are dropped. In the current corpus that affects 16 articles, one citation each, so row sums
+    reproduce `TotalCitations` for 209 of 232 articles rather than all of them.
+
+    Note that the newest calendar year is usually still in progress, so its counts are partial.
+    Trimming it, and trimming offsets with too few articles left, is left to the caller.
+    """
+    citation_cols = [c for c in articles.columns if _CITATION_COL_PATTERN.fullmatch(c)]
+    if not citation_cols:
+        raise ValueError("no `Citations20XX` columns found on the supplied frame")
+    if "PublicationYear" not in articles.columns:
+        raise ValueError("`PublicationYear` column is required to compute years since publication")
+
+    long = (
+        articles.reset_index(names="_article")
+        .melt(
+            id_vars=["_article", "PublicationYear"],
+            value_vars=citation_cols,
+            var_name="_calendar_col",
+            value_name="citations",
+        )
+    )
+    long["_offset"] = (
+        long["_calendar_col"].str.extract(r"(\d{4})")[0].astype(int)
+        - long["PublicationYear"].astype(int)
+    )
+    # citations recorded before an article existed are metadata noise, never a real offset
+    long = long.loc[long["_offset"] >= (0 if include_publication_year else 1)]
+    long["citations"] = long["citations"].fillna(0)
+
+    wide = long.pivot_table(
+        index="_article", columns="_offset", values="citations", aggfunc="sum"
+    ).sort_index(axis=1)
+    if cumulative:
+        wide = wide.cumsum(axis=1)
+
+    wide.columns = [f"year_{int(offset)}" for offset in wide.columns]
+    wide.index.name = articles.index.name
+    return wide.reindex(articles.index)
