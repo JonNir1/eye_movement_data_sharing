@@ -14,6 +14,8 @@
 !tests/test_*.py
 
 # Documents and images (article drafts, figures, etc.)
+manuscript/
+output/
 *.pdf
 *.docx
 *.doc
@@ -22,31 +24,20 @@
 *.png
 *.tmp
 
+# Source data plus the derived parquet frames (see helpers/config.py)
+data_store/
+
 # --- Python ---
-# Byte-compiled / optimized
 __pycache__/
-*.py[codz]
-*$py.class
 
 # Environments
-.env
 .venv
-env/
-venv/
-ENV/
 
-# Jupyter / IPython
+# Jupyter
 .ipynb_checkpoints
-profile_default/
-ipython_config.py
 
-# Test / coverage
+# Test
 .pytest_cache/
-.coverage
-htmlcov/
 
 # --- Editor ---
 .idea/
-
-# Source data plus the derived parquet frames (see helpers/config.py)
-data_store/
