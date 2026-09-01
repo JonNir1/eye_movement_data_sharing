@@ -44,6 +44,53 @@ between notebooks.
 `__init__.py` anywhere — these are namespace packages, and helper modules use absolute
 imports (`from helpers.config import ...`).
 
+## Revision plan (v2)
+
+The submitted version is under major revision (BR-NCR-26-005, resubmit by 09-Feb-2027). The
+reviewer's substantive asks: include other known citation predictors rather than testing
+sharing alone, stop describing near-significant effects as noteworthy, and add Bayesian
+analyses. The notebooks are the work-in-progress answer to that.
+
+Results order in the revised manuscript:
+
+1. feature descriptives and appendix figures (nb 01)
+2. sharing status against the other article features (nb 02)
+3. multivariable regression on total citations: age and venue dominate, sharing is null (nb 03)
+4. 3-year cumulative citations on the same covariates, normalizing for age (nb 03/04)
+5. citation dynamics (nb 04)
+6. FWCI (nb 05)
+
+Decisions already taken, each of which needs re-arguing before it is changed:
+
+- **The 3-year window is determined, not chosen.** It is the largest k for which every article
+  has k complete post-publication calendar years (latest publication 2022, and 2025 is closed).
+  It is therefore not a sample restriction: all 232 articles are retained, which also respects
+  the reviewer's two separate requests not to shrink the sample. Sensitivity analyses run
+  downward (1, 2 years); 5 years would drop articles.
+- **No two-stage residualization.** Fit one multivariable model with the windowed count as the
+  DV. Regressing on venue and then t-testing the residuals gives the right point estimate and
+  the wrong standard errors.
+- **FWCI is the declared primary endpoint**, as it was in v1. The other two citation DVs are
+  secondary operationalizations. No multiplicity correction across the three: they are near
+  functions of the same counts, so the effective number of tests is close to one. BH still
+  applies within the nb 02 covariate table, where the tests really are distinct.
+- **FWCI excludes age from its model**, since OpenAlex normalizes it by field, year, and
+  document type. Venue is *not* baked in, and is a plausible mediator rather than a confounder
+  (sharers publish in higher-impact venues), so report both the unadjusted and the
+  venue-adjusted model and read the difference as mechanism, not as nuisance.
+- **Superseded v1 analyses stay in the notebooks**, clearly marked as superseded, so the
+  published results remain reproducible. They do not appear in the revised manuscript.
+
+Still open:
+
+- **Bayes factors are not implemented anywhere.** This is the one reviewer request the current
+  plan does not touch, and it is what would let the null sharing effect be reported as evidence
+  for the null rather than hedged.
+- **Whether citation dynamics survives as inference.** Year-by-year tests with N falling from
+  232 to 83 are the pattern the reviewer objected to. The intended replacement is a single
+  longitudinal model (sharing x year interaction, random intercept per article), with the
+  year-by-year plot kept as description. See the TODO at the bottom of nb 04.
+
 ## Environment
 
 Use the project venv — the system Python does not have the required packages:
