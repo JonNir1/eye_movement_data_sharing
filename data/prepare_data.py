@@ -75,6 +75,7 @@ def _load_or_fetch_metadata(path: str, godwin_dataset: pd.DataFrame) -> pd.DataF
         metadata = fetch_all_metadata(godwin_dataset, sleep_period=0.01, verbose=True)
         metadata.to_csv(path, index=True)
     metadata["Pub2UpdateTime"] = pd.to_timedelta(metadata["Pub2UpdateTime"])    # validate casting
+    metadata["LastUpdate"] = pd.to_datetime(metadata["LastUpdate"], utc=True)   # validate casting
     return metadata
 
 
