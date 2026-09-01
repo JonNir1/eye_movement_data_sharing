@@ -19,6 +19,9 @@ from prepare_data import _assign_eyemovement_sharing_class
 @pytest.fixture(scope="module")
 def combined() -> pd.DataFrame:
     """The N=232 analytic sample, rebuilt from source."""
+    # Keep this on `build_analytic_sample()`; do NOT switch it to `load_or_build()`. That would
+    # read a parquet cache, letting a stale cache pass a regression, and would *write* one as a
+    # side effect of running the tests. `build_analytic_sample()` only reads.
     return dataset.build_analytic_sample(verbose=False)
 
 
