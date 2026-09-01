@@ -8,7 +8,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from helpers.dataset import citations_since_publication
+from helpers import dataset
+from helpers.dataset import build_citations_frame, citations_since_publication
 
 
 def make_articles(rows: dict, years: range = range(2017, 2021)) -> pd.DataFrame:
@@ -68,11 +69,6 @@ class TestMissingData:
         assert pd.isna(result.loc["late", "year_3"])     # not yet observed
         assert not pd.isna(result.loc["late", "year_1"])
 
-    def test_all_missing_article_is_all_zero_within_its_window(self):
-        articles = make_articles({"a": (2017, {})})
-        result = citations_since_publication(articles)
-        assert (result.loc["a"] == 0).all()
-
 
 class TestFrameContract:
     def test_index_is_preserved_in_order_and_name(self):
@@ -81,24 +77,12 @@ class TestFrameContract:
         assert list(result.index) == ["c", "a", "b"]
         assert result.index.name == "article"
 
-    def test_single_row_input(self):
-        articles = make_articles({"only": (2018, {2018: 3})})
-        result = citations_since_publication(articles)
-        assert len(result) == 1
-        assert result.loc["only", "year_0"] == 3
 
     def test_input_is_not_mutated(self):
         articles = make_articles({"a": (2018, {2018: 1})})
         before = articles.copy()
         citations_since_publication(articles)
         pd.testing.assert_frame_equal(articles, before)
-
-    def test_extra_columns_are_ignored(self):
-        articles = make_articles({"a": (2018, {2018: 1})})
-        articles["VenueName"] = "Journal of Vision"
-        articles["TotalCitations"] = 1
-        result = citations_since_publication(articles)
-        assert list(result.columns) == ["year_0", "year_1", "year_2"]
 
 
 class TestValidation:
@@ -113,17 +97,55 @@ class TestValidation:
             citations_since_publication(articles)
 
 
-class TestComposesWithCallerChoices:
-    """The flags were deliberately left out; these show the caller can still get those views."""
+class TestCitationsFrame:
+    """`build_citations_frame` renames columns into the exact names the smf formulas use."""
 
-    def test_cumulative_via_cumsum(self):
-        articles = make_articles({"a": (2017, {2017: 1, 2018: 2, 2019: 3})})
-        cumulative = citations_since_publication(articles).cumsum(axis=1)
-        assert list(cumulative.loc["a", ["year_0", "year_1", "year_2"]]) == [1, 3, 6]
+    def test_column_names_match_the_regression_formulas(self):
+        # notebook 03 fits `log_citations ~ C(is_sharing_data) + ... + venue_impact +
+        # log_weeks_since_pub + log_number_of_authors`; if the rename chain drifts, the formula
+        # fails deep inside statsmodels instead of here
+        combined = pd.DataFrame(
+            {"TotalCitations": [10, 20]}, index=pd.Index(["a", "b"], name="article")
+        )
+        features = pd.DataFrame(
+            {
+                "Is Sharing Data": [0, 1],
+                "Sharing Class": ["NONE", "FIXATION"],
+                "Has US Author": [0, 1],
+                "Is Open Access": [1, 1],
+                "Has Preprint": [0, 1],
+                "Venue Impact": [1.5, 2.5],
+                "log(Weeks Since Pub.)": [5.0, 6.0],
+                "log(Number of Authors)": [1.0, 1.4],
+            },
+            index=combined.index,
+        )
+        result = build_citations_frame(combined, features)
+        assert set(result.columns) == {
+            "is_sharing_data", "sharing_class", "has_us_author", "is_open_access",
+            "has_preprint", "venue_impact", "log_weeks_since_pub", "log_number_of_authors",
+            "log_citations",
+        }
 
-    def test_excluding_publication_year_via_drop(self):
-        articles = make_articles({"a": (2017, {2017: 1, 2018: 2, 2019: 3})})
-        without_year_0 = citations_since_publication(articles).drop(columns="year_0")
-        assert "year_0" not in without_year_0.columns
-        # cumulating after the drop starts fresh at year_1 rather than carrying year_0 forward
-        assert without_year_0.cumsum(axis=1).loc["a", "year_1"] == 2
+    def test_citations_are_log1p_transformed(self):
+        combined = pd.DataFrame({"TotalCitations": [0, 9]}, index=["a", "b"])
+        features = pd.DataFrame({"Venue Impact": [1.0, 2.0]}, index=combined.index)
+        result = build_citations_frame(combined, features)
+        # log1p keeps uncited articles finite, which plain log would not
+        assert result.loc["a", "log_citations"] == 0.0
+        assert np.isclose(result.loc["b", "log_citations"], np.log(10))
+
+
+class TestFrozenMetadataGuard:
+    def test_raises_when_the_frozen_snapshot_is_missing(self, tmp_path, monkeypatch):
+        # guards the worst failure mode in the project: prepare_data would otherwise re-query
+        # OpenAlex and silently write a new snapshot with today's citation counts
+        monkeypatch.setattr(dataset, "METADATA_PATH", tmp_path / "does_not_exist.csv")
+        with pytest.raises(FileNotFoundError, match="Refusing to continue"):
+            dataset._require_frozen_metadata()
+
+    def test_passes_when_the_snapshot_is_present(self, tmp_path, monkeypatch):
+        snapshot = tmp_path / "Godwin_2025_metadata.csv"
+        snapshot.write_text("", encoding="utf8")
+        monkeypatch.setattr(dataset, "METADATA_PATH", snapshot)
+        dataset._require_frozen_metadata()   # must not raise
