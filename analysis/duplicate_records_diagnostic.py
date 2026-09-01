@@ -17,16 +17,24 @@ Usage:
 (expects ``Godwin_2025_dataset.xlsx`` and ``Godwin_2025_metadata.csv`` in the working directory).
 """
 import os
+import sys
+from pathlib import Path
 from typing import Optional
 
 import pandas as pd
 
-# the acquisition modules live in `data/`, which is not a sibling of this file
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "data"))
 
-from prepare_data import load_godwin2025
+def _load_godwin2025():
+    """Import lazily: `prepare_data` pulls in `fetch_metadata`, which reads API credentials from
+    `_api_secrets` at *import* time even though no API call is made here. Deferred to call time,
+    same as `helpers.dataset._prepare_analytical_dataset()`, so merely importing this module
+    doesn't require credentials - calling `find_duplicate_doi_records()` still does, cache or
+    not, since it always re-reads the source Excel file rather than a cached frame."""
+    data_dir = Path(__file__).resolve().parents[1] / "data"
+    if str(data_dir) not in sys.path:
+        sys.path.insert(0, str(data_dir))
+    from prepare_data import load_godwin2025
+    return load_godwin2025
 
 
 def find_duplicate_doi_records(
@@ -44,7 +52,7 @@ def find_duplicate_doi_records(
     if not os.path.isfile(metadata_path):
         raise FileNotFoundError(f"Metadata cache not found: {metadata_path}")
 
-    dataset = load_godwin2025(dataset_path)
+    dataset = _load_godwin2025()(dataset_path)
     metadata = (
         pd.read_csv(metadata_path)
         .rename(columns={"Unnamed: 0": "idx"})
