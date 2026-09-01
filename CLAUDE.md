@@ -17,7 +17,7 @@ current in-progress revision; `brief report.pdf` is the version that was submitt
 
 ```
 data/       acquisition only - OpenAlex/CrossRef fetching, and _api_secrets.py
-analysis/   five notebooks, one per research question, plus helpers/
+analysis/   six notebooks, one per research question, plus helpers/
 output/     exported figures
 data_store/ source data AND the derived parquet frames (gitignored)
 ```
@@ -33,11 +33,12 @@ between notebooks.
 
 | Notebook | Question |
 |---|---|
-| `01_dataset_and_descriptives` | What is the corpus, and does it match Godwin et al.? |
-| `02_sharing_and_article_features` | Is sharing associated with other article characteristics? |
-| `03_citation_counts` | Do sharing articles accrue more raw citations? |
-| `04_citation_dynamics` | When does the advantage appear, and does it persist? |
-| `05_fwci` | Do sharing articles score higher on field-weighted impact? |
+| `01_dataset_construction` | What is the corpus, how was it built, and does it match Godwin et al.? |
+| `02_feature_descriptives` | What do the article and impact features look like, overall and by sharing status? |
+| `03_sharing_and_article_features` | Is sharing associated with other article characteristics? |
+| `04_citation_counts` | Do sharing articles accrue more raw citations? |
+| `05_citation_dynamics` | When does the advantage appear, and does it persist? |
+| `06_fwci` | Do sharing articles score higher on field-weighted impact? |
 
 `analysis/helpers/` holds only code that two or more notebooks import (`config`, `dataset`,
 `stats`, `plotting`). Single-notebook helpers stay inline on purpose. There is no
@@ -53,12 +54,12 @@ analyses. The notebooks are the work-in-progress answer to that.
 
 Results order in the revised manuscript:
 
-1. feature descriptives and appendix figures (nb 01)
-2. sharing status against the other article features (nb 02)
-3. multivariable regression on total citations: age and venue dominate, sharing is null (nb 03)
-4. 3-year cumulative citations on the same covariates, normalizing for age (nb 03/04)
-5. citation dynamics (nb 04)
-6. FWCI (nb 05)
+1. feature descriptives and appendix figures (nb 02)
+2. sharing status against the other article features (nb 03)
+3. multivariable regression on total citations: age and venue dominate, sharing is null (nb 04)
+4. 3-year cumulative citations on the same covariates, normalizing for age (nb 04/05)
+5. citation dynamics (nb 05)
+6. FWCI (nb 06)
 
 Decisions already taken, each of which needs re-arguing before it is changed:
 
@@ -73,7 +74,7 @@ Decisions already taken, each of which needs re-arguing before it is changed:
 - **FWCI is the declared primary endpoint**, as it was in v1. The other two citation DVs are
   secondary operationalizations. No multiplicity correction across the three: they are near
   functions of the same counts, so the effective number of tests is close to one. BH still
-  applies within the nb 02 covariate table, where the tests really are distinct.
+  applies within the nb 03 covariate table, where the tests really are distinct.
 - **FWCI excludes age from its model**, since OpenAlex normalizes it by field, year, and
   document type. Venue is *not* baked in, and is a plausible mediator rather than a confounder
   (sharers publish in higher-impact venues), so report both the unadjusted and the
@@ -89,7 +90,7 @@ Still open:
 - **Whether citation dynamics survives as inference.** Year-by-year tests with N falling from
   232 to 83 are the pattern the reviewer objected to. The intended replacement is a single
   longitudinal model (sharing x year interaction, random intercept per article), with the
-  year-by-year plot kept as description. See the TODO at the bottom of nb 04.
+  year-by-year plot kept as description. See the TODO at the bottom of nb 05.
 
 ## Environment
 
