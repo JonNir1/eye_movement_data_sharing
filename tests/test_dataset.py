@@ -1,4 +1,5 @@
-"""Unit tests for `helpers.dataset.citations_since_publication`.
+"""Unit tests for `helpers.dataset.citations_since_publication` and
+`helpers.dataset.cumulative_citations_through_shared_year`.
 
 These build small frames by hand rather than loading the corpus: the real data lives in the
 gitignored `data_store/`, and a unit test should not depend on it being present.
@@ -9,15 +10,30 @@ import pandas as pd
 import pytest
 
 from helpers import dataset
-from helpers.dataset import build_citations_frame, citations_since_publication
+from helpers.dataset import (
+    build_citations_frame, citations_since_publication, cumulative_citations_through_shared_year,
+)
 
 
-def make_articles(rows: dict, years: range = range(2017, 2021)) -> pd.DataFrame:
-    """Build an articles frame from {article_id: (publication_year, {calendar_year: count})}."""
+def make_articles(
+        rows: dict,
+        years: range = range(2017, 2021),
+        last_update: dict = None,
+        total_citations: dict = None,
+) -> pd.DataFrame:
+    """Build an articles frame from {article_id: (publication_year, {calendar_year: count})}.
+
+    `last_update` and `total_citations` are optional {article_id: value} maps, only needed by
+    tests for `cumulative_citations_through_shared_year`.
+    """
     index = pd.Index(list(rows), name="article")
     data = {"PublicationYear": [rows[a][0] for a in rows]}
     for year in years:
         data[f"Citations{year}"] = [rows[a][1].get(year, np.nan) for a in rows]
+    if last_update is not None:
+        data["LastUpdate"] = pd.to_datetime([last_update[a] for a in rows], utc=True)
+    if total_citations is not None:
+        data["TotalCitations"] = [total_citations[a] for a in rows]
     return pd.DataFrame(data, index=index)
 
 
@@ -134,6 +150,121 @@ class TestCitationsFrame:
         # log1p keeps uncited articles finite, which plain log would not
         assert result.loc["a", "log_citations"] == 0.0
         assert np.isclose(result.loc["b", "log_citations"], np.log(10))
+
+
+class TestCumulativeCitationsThroughSharedYear:
+    """`cumulative_citations_through_shared_year` - the intended `TotalCitations` replacement."""
+
+    def test_shared_year_is_the_last_full_year_before_the_earliest_census(self):
+        # earliest LastUpdate is Nov 2025 -> 2025 isn't guaranteed complete for that article yet
+        articles = make_articles(
+            {"a": (2018, {}), "b": (2019, {})},
+            years=range(2017, 2025),
+            last_update={"a": "2025-11-06", "b": "2026-01-15"},
+            total_citations={"a": 0, "b": 0},
+        )
+        _, shared_year = cumulative_citations_through_shared_year(articles)
+        assert shared_year == 2024
+
+    def test_cumulative_sums_publication_year_through_shared_year(self):
+        articles = make_articles(
+            {"a": (2018, {2018: 2, 2019: 3, 2020: 1, 2024: 1, 2025: 5})},
+            years=range(2018, 2026),
+            last_update={"a": "2025-11-06"},
+            total_citations={"a": 20},
+        )
+        cumulative, shared_year = cumulative_citations_through_shared_year(articles)
+        assert shared_year == 2024
+        assert cumulative.loc["a"] == 7      # 2 + 3 + 1 + 1, the 2025 citations are excluded
+
+    def test_pre_publication_citations_are_dropped(self):
+        # default `years` is 2017-2020; LastUpdate in 2021 keeps the shared year (2020) in range
+        articles = make_articles(
+            {"a": (2019, {2017: 3, 2019: 4})},
+            last_update={"a": "2021-06-01"},
+            total_citations={"a": 4},
+        )
+        cumulative, _ = cumulative_citations_through_shared_year(articles)
+        assert cumulative.loc["a"] == 4      # the stray pre-publication 3 is dropped
+
+    def test_missing_cell_within_range_reads_as_zero(self):
+        articles = make_articles(
+            {"a": (2017, {2017: 2, 2019: 1})},
+            last_update={"a": "2021-06-01"},
+            total_citations={"a": 3},
+        )
+        cumulative, _ = cumulative_citations_through_shared_year(articles)
+        assert cumulative.loc["a"] == 3      # missing 2018 reads as 0, not NaN
+
+    def test_cumulative_never_exceeds_total_citations(self):
+        # regression guard: a broken input where the partial-year sum overshoots the vendor total
+        articles = make_articles(
+            {"a": (2018, {2018: 10})},
+            years=range(2018, 2020),
+            last_update={"a": "2020-06-01"},   # -> shared year 2019, within the 2018-2019 columns
+            total_citations={"a": 5},          # inconsistent with the 10 in Citations2018
+        )
+        with pytest.raises(ValueError, match="exceed TotalCitations"):
+            cumulative_citations_through_shared_year(articles)
+
+    def test_input_is_not_mutated(self):
+        articles = make_articles(
+            {"a": (2018, {2018: 1})},
+            last_update={"a": "2021-06-01"},
+            total_citations={"a": 1},
+        )
+        before = articles.copy()
+        cumulative_citations_through_shared_year(articles)
+        pd.testing.assert_frame_equal(articles, before)
+
+    def test_index_is_preserved(self):
+        articles = make_articles(
+            {"c": (2017, {}), "a": (2018, {}), "b": (2019, {})},
+            last_update={"c": "2021-06-01", "a": "2021-06-01", "b": "2021-06-01"},
+            total_citations={"c": 0, "a": 0, "b": 0},
+        )
+        cumulative, _ = cumulative_citations_through_shared_year(articles)
+        assert list(cumulative.index) == ["c", "a", "b"]
+        assert cumulative.index.name == "article"
+
+class TestCumulativeValidation:
+    def test_raises_without_citation_columns(self):
+        articles = pd.DataFrame(
+            {"PublicationYear": [2018], "LastUpdate": pd.to_datetime(["2025-06-01"], utc=True),
+             "TotalCitations": [0]},
+            index=["a"],
+        )
+        with pytest.raises(ValueError, match="Citations20XX"):
+            cumulative_citations_through_shared_year(articles)
+
+    @pytest.mark.parametrize("missing_column", ["PublicationYear", "LastUpdate", "TotalCitations"])
+    def test_raises_without_a_required_column(self, missing_column):
+        articles = make_articles(
+            {"a": (2018, {2018: 1})}, last_update={"a": "2025-06-01"}, total_citations={"a": 1}
+        )
+        with pytest.raises(ValueError, match=missing_column):
+            cumulative_citations_through_shared_year(articles.drop(columns=[missing_column]))
+
+    def test_raises_on_missing_last_update(self):
+        articles = make_articles(
+            {"a": (2018, {2018: 1}), "b": (2018, {2018: 1})},
+            last_update={"a": "2025-06-01", "b": "2025-06-01"},
+            total_citations={"a": 1, "b": 1},
+        )
+        articles.loc["b", "LastUpdate"] = pd.NaT
+        with pytest.raises(ValueError, match="LastUpdate"):
+            cumulative_citations_through_shared_year(articles)
+
+    def test_raises_when_shared_year_outruns_available_citation_columns(self):
+        # every article censused in 2020 -> shared year 2019, but the frame only has 2017 data
+        articles = make_articles(
+            {"a": (2017, {2017: 1})},
+            years=range(2017, 2018),
+            last_update={"a": "2020-01-01"},
+            total_citations={"a": 1},
+        )
+        with pytest.raises(ValueError, match="more recent than the latest available"):
+            cumulative_citations_through_shared_year(articles)
 
 
 class TestFrozenMetadataGuard:

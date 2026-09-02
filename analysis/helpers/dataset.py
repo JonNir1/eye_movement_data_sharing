@@ -241,3 +241,79 @@ def citations_since_publication(articles: pd.DataFrame) -> pd.DataFrame:
     wide.columns = [f"year_{int(offset)}" for offset in wide.columns]
     wide.index.name = articles.index.name
     return wide.reindex(articles.index)
+
+
+def cumulative_citations_through_shared_year(articles: pd.DataFrame) -> Tuple[pd.Series, int]:
+    """Cumulative citations per article, from its own publication year through the latest
+    calendar year every article in the frame is guaranteed to have complete data for.
+
+    `TotalCitations` is not directly comparable across articles: OpenAlex computes it as of each
+    article's own `LastUpdate` (census) timestamp, and those timestamps can differ by months
+    within a single fetch. This instead time-locks every article to the same calendar-year cutoff
+    - the latest year that had already fully elapsed before the *earliest* `LastUpdate` in the
+    frame - so the result means "citations received through year Y" identically for every row,
+    making it the intended replacement for `TotalCitations` as a citation-count DV.
+
+    Citations from calendar years before an article's own `PublicationYear` are dropped, same
+    convention as `citations_since_publication`. Missing cells within the summed range read as
+    zero, since OpenAlex omits years with no citations rather than reporting an explicit zero.
+
+    :param articles: frame indexed by article, carrying `PublicationYear`, `LastUpdate`, one or
+        more `Citations20XX` columns, and `TotalCitations`.
+    :return: `(cumulative, shared_year)` - a Series indexed like `articles`, and the calendar
+        year its cumulative count runs through (inclusive).
+    :raises ValueError: if a required column is missing or unparseable, if `LastUpdate` cannot
+        establish a shared year within the available `Citations20XX` columns, or if the resulting
+        cumulative count exceeds `TotalCitations` for any article.
+    """
+    citation_cols = {
+        col: int(col[len("Citations"):])
+        for col in articles.columns if _CITATION_COL_PATTERN.fullmatch(col)
+    }
+    if not citation_cols:
+        raise ValueError("no `Citations20XX` columns found on the supplied frame")
+    for required in ("PublicationYear", "LastUpdate", "TotalCitations"):
+        if required not in articles.columns:
+            raise ValueError(f"`{required}` column is required to compute cumulative citations")
+
+    last_update = pd.to_datetime(articles["LastUpdate"], utc=True)
+    if last_update.isna().any():
+        raise ValueError("`LastUpdate` has missing values; cannot determine a shared complete year")
+
+    shared_year = last_update.min().year - 1
+    latest_available_year = max(citation_cols.values())
+    if shared_year > latest_available_year:
+        raise ValueError(
+            f"shared year {shared_year} is more recent than the latest available citation "
+            f"column (Citations{latest_available_year})"
+        )
+
+    long = (
+        articles.reset_index(names="_article")
+        .melt(
+            id_vars=["_article", "PublicationYear"],
+            value_vars=list(citation_cols),
+            var_name="_col",
+            value_name="citations",
+        )
+    )
+    long["_year"] = long["_col"].map(citation_cols)
+    long = long.loc[long["_year"].between(long["PublicationYear"], shared_year)]
+    long["citations"] = long["citations"].fillna(0)
+
+    cumulative = (
+        long.groupby("_article")["citations"].sum()
+        .reindex(articles.index)
+        .fillna(0)
+        .rename("cumulative_citations")
+    )
+    cumulative.index.name = articles.index.name
+
+    overflow = cumulative > articles["TotalCitations"]
+    if overflow.any():
+        raise ValueError(
+            f"cumulative citations exceed TotalCitations for {overflow.sum()} article(s): "
+            f"{list(cumulative.index[overflow])}"
+        )
+
+    return cumulative, shared_year
