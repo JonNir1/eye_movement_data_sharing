@@ -283,6 +283,11 @@ def _fetch_work_by_url_unsafe(article_link: str) -> Optional[dict]:
 
 def _fetch_work_by_title_unsafe(title: str) -> Optional[dict]:
     title = title.strip().lower()
+    if not title:
+        # a blank `title.search` filter is rejected by OpenAlex's API as invalid, not "no match" -
+        # treat a missing title the same as any other unmatched title rather than letting that
+        # surface as a confusing per-record error.
+        return None
     found_works = pyalex.Works().search_filter(title=title).get()
     found_works = [work for work in found_works if work.get("title", "").strip().lower() == title]
     if len(found_works) > 1:
