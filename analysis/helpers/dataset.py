@@ -78,7 +78,7 @@ def build_merged() -> pd.DataFrame:
 
 
 def build_analytic_sample(verbose: bool = True) -> pd.DataFrame:
-    """Apply the five exclusion criteria to the Godwin corpus, yielding the N=232 sample."""
+    """Apply the five exclusion criteria to the Godwin corpus, yielding the N=234 sample."""
     merged = build_merged()
     if verbose:
         print(f"Full Godwin et al. (2025) dataset: {len(merged)} articles")
@@ -209,7 +209,7 @@ def citations_since_publication(articles: pd.DataFrame) -> pd.DataFrame:
 
     Citations dated to a calendar year *before* the publication year have no meaningful offset and
     are dropped. In the current corpus that affects 16 articles, one citation each. Row sums
-    therefore reproduce `TotalCitations` for 209 of 232 articles; the remaining 7 are articles whose
+    therefore reproduce `TotalCitations` for 211 of 234 articles; the remaining 7 are articles whose
     OpenAlex `TotalCitations` already exceeds the sum of its own `counts_by_year` by one, which is a
     discrepancy in the source data rather than anything this function does.
     """
