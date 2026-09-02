@@ -196,6 +196,18 @@ class TestCumulativeCitationsThroughSharedYear:
         cumulative, _ = cumulative_citations_through_shared_year(articles)
         assert cumulative.loc["a"] == 3      # missing 2018 reads as 0, not NaN
 
+    def test_never_cited_article_gets_zero_not_dropped(self):
+        # "b" has no value in any Citations20XX column - a real zero, not a fetch failure -
+        # while "a" carries citations so the columns exist at all in this frame
+        articles = make_articles(
+            {"a": (2018, {2019: 5}), "b": (2018, {})},
+            last_update={"a": "2021-06-01", "b": "2021-06-01"},
+            total_citations={"a": 5, "b": 0},
+        )
+        cumulative, _ = cumulative_citations_through_shared_year(articles)
+        assert list(cumulative.index) == ["a", "b"]   # "b" is present, not dropped
+        assert cumulative.loc["b"] == 0
+
     def test_cumulative_never_exceeds_total_citations(self):
         # regression guard: a broken input where the partial-year sum overshoots the vendor total
         articles = make_articles(

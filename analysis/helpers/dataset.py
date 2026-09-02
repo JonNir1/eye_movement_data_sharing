@@ -256,7 +256,9 @@ def cumulative_citations_through_shared_year(articles: pd.DataFrame) -> Tuple[pd
 
     Citations from calendar years before an article's own `PublicationYear` are dropped, same
     convention as `citations_since_publication`. Missing cells within the summed range read as
-    zero, since OpenAlex omits years with no citations rather than reporting an explicit zero.
+    zero, since OpenAlex omits years with no citations rather than reporting an explicit zero -
+    an article with no citations in any year has no `Citations20XX` value anywhere in its row
+    (never an empty row), and correctly resolves to a cumulative count of 0, not a dropped row.
 
     :param articles: frame indexed by article, carrying `PublicationYear`, `LastUpdate`, one or
         more `Citations20XX` columns, and `TotalCitations`.
