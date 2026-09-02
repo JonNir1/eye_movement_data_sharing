@@ -243,16 +243,34 @@ def citations_since_publication(articles: pd.DataFrame) -> pd.DataFrame:
     return wide.reindex(articles.index)
 
 
-def cumulative_citations_through_shared_year(articles: pd.DataFrame) -> Tuple[pd.Series, int]:
-    """Cumulative citations per article, from its own publication year through the latest
-    calendar year every article in the frame is guaranteed to have complete data for.
+def _shared_complete_year(articles: pd.DataFrame) -> int:
+    """The latest calendar year every article in the frame is guaranteed to have complete data
+    for: the year before the *earliest* `LastUpdate` (OpenAlex census) timestamp in the frame.
+
+    Shared across every DV that needs to time-lock articles to a common cutoff instead of each
+    article's own (differently timed) census - see `citations_through_shared_year` and
+    `weeks_through_shared_year`.
+
+    :param articles: frame indexed by article, carrying `LastUpdate`.
+    :raises ValueError: if `LastUpdate` is missing or has missing values.
+    """
+    if "LastUpdate" not in articles.columns:
+        raise ValueError("`LastUpdate` column is required to determine the shared complete year")
+    last_update = pd.to_datetime(articles["LastUpdate"], utc=True)
+    if last_update.isna().any():
+        raise ValueError("`LastUpdate` has missing values; cannot determine a shared complete year")
+    return last_update.min().year - 1
+
+
+def citations_through_shared_year(articles: pd.DataFrame) -> Tuple[pd.Series, int]:
+    """Cumulative citations per article, from its own publication year through the shared
+    complete year (see `_shared_complete_year`).
 
     `TotalCitations` is not directly comparable across articles: OpenAlex computes it as of each
     article's own `LastUpdate` (census) timestamp, and those timestamps can differ by months
     within a single fetch. This instead time-locks every article to the same calendar-year cutoff
-    - the latest year that had already fully elapsed before the *earliest* `LastUpdate` in the
-    frame - so the result means "citations received through year Y" identically for every row,
-    making it the intended replacement for `TotalCitations` as a citation-count DV.
+    so the result means "citations received through year Y" identically for every row, making it
+    the intended replacement for `TotalCitations` as a citation-count DV.
 
     Citations from calendar years before an article's own `PublicationYear` are dropped, same
     convention as `citations_since_publication`. Missing cells within the summed range read as
@@ -264,9 +282,9 @@ def cumulative_citations_through_shared_year(articles: pd.DataFrame) -> Tuple[pd
         more `Citations20XX` columns, and `TotalCitations`.
     :return: `(cumulative, shared_year)` - a Series indexed like `articles`, and the calendar
         year its cumulative count runs through (inclusive).
-    :raises ValueError: if a required column is missing or unparseable, if `LastUpdate` cannot
-        establish a shared year within the available `Citations20XX` columns, or if the resulting
-        cumulative count exceeds `TotalCitations` for any article.
+    :raises ValueError: if a required column is missing or unparseable, if the shared year falls
+        outside the available `Citations20XX` columns, or if the resulting cumulative count
+        exceeds `TotalCitations` for any article.
     """
     citation_cols = {
         col: int(col[len("Citations"):])
@@ -274,15 +292,11 @@ def cumulative_citations_through_shared_year(articles: pd.DataFrame) -> Tuple[pd
     }
     if not citation_cols:
         raise ValueError("no `Citations20XX` columns found on the supplied frame")
-    for required in ("PublicationYear", "LastUpdate", "TotalCitations"):
+    for required in ("PublicationYear", "TotalCitations"):
         if required not in articles.columns:
             raise ValueError(f"`{required}` column is required to compute cumulative citations")
 
-    last_update = pd.to_datetime(articles["LastUpdate"], utc=True)
-    if last_update.isna().any():
-        raise ValueError("`LastUpdate` has missing values; cannot determine a shared complete year")
-
-    shared_year = last_update.min().year - 1
+    shared_year = _shared_complete_year(articles)
     latest_available_year = max(citation_cols.values())
     if shared_year > latest_available_year:
         raise ValueError(
@@ -319,3 +333,38 @@ def cumulative_citations_through_shared_year(articles: pd.DataFrame) -> Tuple[pd
         )
 
     return cumulative, shared_year
+
+
+def weeks_through_shared_year(articles: pd.DataFrame) -> Tuple[pd.Series, int]:
+    """Article age in weeks, from `PublicationDate` through the end of the shared complete year
+    (see `_shared_complete_year`) - the intended replacement for `Pub2UpdateTime`, which is not
+    comparable across articles since it is anchored to each article's own (differently timed)
+    `LastUpdate` census rather than a single shared cutoff.
+
+    :param articles: frame indexed by article, carrying `PublicationDate` and `LastUpdate`.
+    :return: `(weeks, shared_year)` - weeks indexed like `articles`, and the calendar year used
+        as the cutoff (see `citations_through_shared_year`).
+    :raises ValueError: if `PublicationDate` or `LastUpdate` is missing or unparseable, or if any
+        article was published after the shared year already ended.
+    """
+    if "PublicationDate" not in articles.columns:
+        raise ValueError("`PublicationDate` column is required to compute weeks through the shared year")
+    publication_date = pd.to_datetime(articles["PublicationDate"], utc=True)
+    if publication_date.isna().any():
+        raise ValueError("`PublicationDate` has missing values")
+
+    shared_year = _shared_complete_year(articles)
+    cutoff = pd.Timestamp(f"{shared_year + 1}-01-01", tz="UTC")
+
+    weeks = ((cutoff - publication_date) / pd.Timedelta(weeks=1)).rename("weeks_through_shared_year")
+    weeks.index.name = articles.index.name
+
+    too_late = weeks < 0
+    if too_late.any():
+        raise ValueError(
+            f"{int(too_late.sum())} article(s) were published after the shared year "
+            f"{shared_year} ended, so their age through it is undefined: "
+            f"{list(weeks.index[too_late])}"
+        )
+
+    return weeks, shared_year
