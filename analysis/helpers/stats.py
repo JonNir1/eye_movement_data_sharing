@@ -5,7 +5,7 @@ is that `BINARY_FEATURES` is imported from `helpers.config` rather than read off
 globals.
 """
 
-from typing import Literal
+from typing import Dict, Literal
 
 import numpy as np
 import pandas as pd
