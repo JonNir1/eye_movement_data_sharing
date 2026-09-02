@@ -52,7 +52,7 @@ def fetch_single_metadata(link: str, title: str, idx, venue_cache: Optional[dict
     venue_cache = venue_cache if venue_cache is not None else {}
     result = dict()
     try:
-        work = _fetch_work_by_doi_unsafe(link)
+        work = _fetch_work_by_doi_unsafe(_MANUAL_LINK_OVERRIDES.get(link, link))
         if not work:
             work = _fetch_work_by_url_unsafe(link)
         if not work:
@@ -100,6 +100,18 @@ _PREPRINT_SERVER_KEYWORDS = ("rxiv", "preprint", "research square", "ssrn")
 _CONFIRMED_PREPRINTS = {
     "W3126793843", "W3154689434", "W2795516647", "W4225688097",
     "W3160619806", "W3168479376", "W2963765204", "W3126301271",
+}
+
+# `PAPER_LINK` values that resolve to a work only via a matched-in-the-moment `landing_page_url`
+# filter (no DOI in the link, and Godwin's record is missing a title for the title-search
+# fallback), so a re-fetch silently loses the match the moment OpenAlex's location indexing for
+# that URL changes. Pinning the DOI here bypasses the fragile URL/title cascade entirely.
+# - PubMed 34843369 -> Boettcher, Shalev, Wolfe & Nobre (2022), "Right place, right time:
+#   Spatiotemporal predictions guide attention in dynamic visual search", J Exp Psychol Gen.
+#   Independently confirmed via NCBI's own PMID->DOI record (esummary.fcgi), which matches the
+#   DOI, authors, and journal already on file - the original match was correct.
+_MANUAL_LINK_OVERRIDES = {
+    "https://pubmed.ncbi.nlm.nih.gov/34843369/": "10.1037/xge0000901",
 }
 
 
