@@ -27,6 +27,22 @@ data_store/ source data AND the derived parquet frames (gitignored)
 regenerable `*.parquet` frames. To force a rebuild, delete only the parquet files, or call
 `load_or_build(rebuild=True)`.
 
+**The parquet cache is a pure function of `(Godwin_2025_dataset.xlsx, Godwin_2025_metadata.csv)`**
+- `build_merged()` / `build_analytic_sample()` read only those two files, with no other input and
+no dependency on wall-clock time. So it never needs its own backup: given any past copy of the
+metadata CSV (the xlsx never changes), `load_or_build(rebuild=True)` reproduces the exact parquet
+cache that CSV would have produced.
+
+**Re-fetching the metadata CSV is a deliberate, rare, and consequential action** - it moves the
+one thing in this repo that genuinely cannot be reconstructed, and changes every citation-based
+number the manuscript reports (N=232, all citation counts, FWCI, ...). Before overwriting the
+live `Godwin_2025_metadata.csv`, copy the outgoing file to `Godwin_2025_metadata.backup.csv`
+(overwriting *that* is fine - it only ever needs to hold the immediately-prior snapshot, not a
+history). After the CSV is replaced, rebuild the parquet cache with `load_or_build(rebuild=True)`
+and re-check the "Sample construction" and "Result invariants" numbers below - they are pinned to
+whichever snapshot was frozen when they were last verified, and a re-fetch is exactly the kind of
+change that can move them.
+
 The notebooks are numbered but independent — each calls `helpers.dataset.load_or_build()`
 and runs from a cold kernel. The parquet cache is an optimization, never a dependency
 between notebooks.
@@ -124,9 +140,9 @@ lazily, so a warm cache runs with no `_api_secrets.py` present at all.
 Check any pipeline change against these counts:
 
 - 251 records after dropping those without a valid title or link
-- 13 OpenAlex queries fail, 6 more return duplicate DOIs
-- **N = 232** analytic sample
-- Groups: `NONE` = 153, `FIX` = 31, `TRIAL` = 25, `PPT` = 23 (sharing total = 79)
+- 11 OpenAlex queries fail, 6 more return duplicate DOIs
+- **N = 234** analytic sample
+- Groups: `NONE` = 154, `FIX` = 31, `TRIAL` = 26, `PPT` = 23 (sharing total = 80)
 
 Articles that shared at more than one level are classified at the **finest** granularity
 available (fixation > trial > participant), so the groups never double-count.
@@ -151,7 +167,7 @@ changing the text too.
   so these are *current* values, not values as of each article's publication — that caveat
   belongs in the text whenever this feature is used.
 - **Preprint detection** is a three-stage cascade: OpenAlex venues (28) → CrossRef
-  (+11 not already found) → repository search (+8) = 47 total (20.3%). A candidate is
+  (+11 not already found) → repository search (+8) = 47 total (20.1%). A candidate is
   accepted only when title similarity is high, first *and* last author match exactly, and
   the preprint year is at or before the publication year.
 - **Statistics**: alpha = 0.05. Tests of the sharing hypothesis are **one-sided**;
@@ -163,17 +179,17 @@ changing the text too.
 
 If a refactor moves any of these, it is a regression until proven otherwise.
 
-- **FWCI**: sharing > non-sharing, one-sided Mann-Whitney p = 0.03, medians 1.51 vs 1.13.
-  Effect is small (r_rb = 0.15, CLES = 0.56).
-- **Age-adjusted residuals**: sharers accrue ~18.3% more citations, but only marginally
-  (t(230) = 1.44, p = 0.076, d = 0.2).
+- **FWCI**: sharing > non-sharing, one-sided Mann-Whitney p = 0.04, medians 1.20 vs 0.92.
+  Effect is small (r_rb = 0.14, CLES = 0.57).
+- **Age-adjusted residuals**: sharers accrue ~17.8% more citations, but only marginally
+  (t(232) = 1.38, p = 0.085, d = 0.19).
 - **Citation dynamics**: significant cumulative advantage in Years 1-4, marginal in 5-7,
   null by Year 8. Citation *velocity* differs only in Year 1 — read as early visibility
-  rather than a sustained rate difference. Attrition caveat: N = 232 at Year 1 falls to
-  83 by Year 7, with only 19 sharers left.
-- **Granularity never matters**: null for FWCI (H = 2.91, p = 0.23), for residuals
-  (H = 1.73, p = 0.42), and in every post-publication year.
-- **Covariate comparison**: sharers publish in higher-impact venues, are 4.35x more likely
+  rather than a sustained rate difference. Attrition caveat: N = 234 at Year 1 falls to
+  84 by Year 7, with only 19 sharers left.
+- **Granularity never matters**: null for FWCI (H = 3.08, p = 0.21), for residuals
+  (H = 2.00, p = 0.37), and in every post-publication year.
+- **Covariate comparison**: sharers publish in higher-impact venues, are 4.30x more likely
   to have a preprint, and are more recent. No difference in author count, U.S. authorship,
   or open-access status.
-- Covariate prevalence: preprint 47 (20.3%), U.S. author 98 (42.2%), open access 193 (83.2%).
+- Covariate prevalence: preprint 47 (20.1%), U.S. author 99 (42.3%), open access 199 (85.0%).
