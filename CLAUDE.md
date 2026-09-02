@@ -27,6 +27,22 @@ data_store/ source data AND the derived parquet frames (gitignored)
 regenerable `*.parquet` frames. To force a rebuild, delete only the parquet files, or call
 `load_or_build(rebuild=True)`.
 
+**The parquet cache is a pure function of `(Godwin_2025_dataset.xlsx, Godwin_2025_metadata.csv)`**
+- `build_merged()` / `build_analytic_sample()` read only those two files, with no other input and
+no dependency on wall-clock time. So it never needs its own backup: given any past copy of the
+metadata CSV (the xlsx never changes), `load_or_build(rebuild=True)` reproduces the exact parquet
+cache that CSV would have produced.
+
+**Re-fetching the metadata CSV is a deliberate, rare, and consequential action** - it moves the
+one thing in this repo that genuinely cannot be reconstructed, and changes every citation-based
+number the manuscript reports (N=232, all citation counts, FWCI, ...). Before overwriting the
+live `Godwin_2025_metadata.csv`, copy the outgoing file to `Godwin_2025_metadata.backup.csv`
+(overwriting *that* is fine - it only ever needs to hold the immediately-prior snapshot, not a
+history). After the CSV is replaced, rebuild the parquet cache with `load_or_build(rebuild=True)`
+and re-check the "Sample construction" and "Result invariants" numbers below - they are pinned to
+whichever snapshot was frozen when they were last verified, and a re-fetch is exactly the kind of
+change that can move them.
+
 The notebooks are numbered but independent — each calls `helpers.dataset.load_or_build()`
 and runs from a cold kernel. The parquet cache is an optimization, never a dependency
 between notebooks.
