@@ -10,9 +10,10 @@ import pandas as pd
 import pytest
 
 from helpers import dataset
+from helpers.config import VENUE_IMPACT_METRIC
 from helpers.dataset import (
-    build_citations_frame, citations_since_publication, citations_through_shared_year,
-    weeks_through_shared_year,
+    build_citations_frame, build_feature_matrix, citations_since_publication,
+    citations_through_shared_year, weeks_through_shared_year,
 )
 
 
@@ -117,16 +118,54 @@ class TestValidation:
             citations_since_publication(articles)
 
 
+class TestFeatureMatrix:
+    """`build_feature_matrix` - age now comes from `weeks_through_shared_year`, not raw
+    `Pub2UpdateTime` (which is anchored to each article's own, differently-timed `LastUpdate`)."""
+
+    def _make_combined(self):
+        combined = make_articles(
+            {"a": (2018, {}), "b": (2019, {})},
+            last_update={"a": "2021-06-01", "b": "2021-06-01"},
+            publication_date={"a": "2018-01-01", "b": "2019-06-01"},
+        )
+        combined["is_sharing_data"] = [0, 1]
+        combined["data_sharing_class"] = ["NONE", "FIXATION"]
+        combined["HasUSAuthor"] = [0, 1]
+        combined["IsOpenAccess"] = [1, 1]
+        combined["HasPreprint"] = [0, 1]
+        combined[VENUE_IMPACT_METRIC] = [1.5, 2.5]
+        combined["NumAuthors"] = [2, 3]
+        return combined
+
+    def test_age_matches_weeks_through_shared_year(self):
+        combined = self._make_combined()
+        result = build_feature_matrix(combined)
+        weeks, _ = weeks_through_shared_year(combined)
+        assert np.allclose(result["log(Weeks Since Pub.)"], np.log(weeks))
+
+    def test_older_article_reports_more_weeks(self):
+        combined = self._make_combined()
+        result = build_feature_matrix(combined)
+        assert result.loc["a", "log(Weeks Since Pub.)"] > result.loc["b", "log(Weeks Since Pub.)"]
+
+
 class TestCitationsFrame:
     """`build_citations_frame` renames columns into the exact names the smf formulas use."""
+
+    def _make_combined(self, total_citations):
+        # years must cover through the shared year (2020, from the 2021-06-01 census below)
+        return make_articles(
+            {a: (2018, {2018: c}) for a, c in total_citations.items()},
+            years=range(2018, 2021),
+            last_update={a: "2021-06-01" for a in total_citations},
+            total_citations=total_citations,
+        )
 
     def test_column_names_match_the_regression_formulas(self):
         # notebook 03 fits `log_citations ~ C(is_sharing_data) + ... + venue_impact +
         # log_weeks_since_pub + log_number_of_authors`; if the rename chain drifts, the formula
         # fails deep inside statsmodels instead of here
-        combined = pd.DataFrame(
-            {"TotalCitations": [10, 20]}, index=pd.Index(["a", "b"], name="article")
-        )
+        combined = self._make_combined({"a": 10, "b": 20})
         features = pd.DataFrame(
             {
                 "Is Sharing Data": [0, 1],
@@ -148,7 +187,7 @@ class TestCitationsFrame:
         }
 
     def test_citations_are_log1p_transformed(self):
-        combined = pd.DataFrame({"TotalCitations": [0, 9]}, index=["a", "b"])
+        combined = self._make_combined({"a": 0, "b": 9})
         features = pd.DataFrame({"Venue Impact": [1.0, 2.0]}, index=combined.index)
         result = build_citations_frame(combined, features)
         # log1p keeps uncited articles finite, which plain log would not

@@ -115,7 +115,14 @@ def build_analytic_sample(verbose: bool = True) -> pd.DataFrame:
 
 
 def build_feature_matrix(combined: pd.DataFrame) -> pd.DataFrame:
-    """Article-level feature matrix: binaries as 0/1, Sharing Class ordinal, continuous logged."""
+    """Article-level feature matrix: binaries as 0/1, Sharing Class ordinal, continuous logged.
+
+    Age is weeks from `PublicationDate` through the shared complete year (see
+    `weeks_through_shared_year`), not raw `Pub2UpdateTime` - the latter is anchored to each
+    article's own `LastUpdate` census, which differs by row and is not what "age" should mean
+    for a DV that itself now runs through a single shared cutoff.
+    """
+    weeks, _ = weeks_through_shared_year(combined)
     return pd.DataFrame({
         "Is Sharing Data": combined["is_sharing_data"].astype(int),
         "Sharing Class": combined["data_sharing_class"].astype(
@@ -125,15 +132,21 @@ def build_feature_matrix(combined: pd.DataFrame) -> pd.DataFrame:
         "Is Open Access": combined["IsOpenAccess"].astype(int),
         "Has Preprint": combined["HasPreprint"].astype(int),
         "Venue Impact": combined[VENUE_IMPACT_METRIC],
-        "log(Weeks Since Pub.)": np.log(combined["Pub2UpdateTime"] / pd.Timedelta(weeks=1)),
+        "log(Weeks Since Pub.)": np.log(weeks),
         "log(Number of Authors)": np.log(combined["NumAuthors"]),
     })
 
 
 def build_citations_frame(combined: pd.DataFrame, features_df: pd.DataFrame) -> pd.DataFrame:
-    """Feature matrix plus log1p citations, with columns renamed for `smf.ols` formulas."""
+    """Feature matrix plus log1p cumulative citations through the shared year (see
+    `citations_through_shared_year`), with columns renamed for `smf.ols` formulas.
+
+    Uses the shared-year DV rather than raw `TotalCitations`, which is not comparable across
+    articles censused at different times within the same fetch.
+    """
+    cumulative, _ = citations_through_shared_year(combined)
     citations_df = features_df.copy()
-    citations_df["log_citations"] = np.log1p(combined["TotalCitations"])
+    citations_df["log_citations"] = np.log1p(cumulative)
     citations_df.columns = citations_df.columns.map(
         # statsmodels `smf.ols()` api doesn't allow whitespace or `log()` in the formula
         lambda col: col.lower().replace(" ", "_").replace(".", "").replace(")", "").replace("log(", "log_")
