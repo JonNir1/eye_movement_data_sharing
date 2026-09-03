@@ -137,9 +137,21 @@ def build_feature_matrix(combined: pd.DataFrame) -> pd.DataFrame:
     })
 
 
+def to_smf_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Rename columns to satisfy `smf.ols()`'s formula syntax, which allows no whitespace, dots,
+    or parentheses: lowercase, spaces and dots dropped, and `log(X)` becomes `log_x`.
+
+    :param df: any frame - typically a feature matrix with a DV column already attached.
+    :return: a copy of `df` with renamed columns; values are untouched.
+    """
+    return df.rename(columns=lambda col: (
+        col.lower().replace(" ", "_").replace(".", "").replace(")", "").replace("log(", "log_")
+    ))
+
+
 def build_citations_frame(combined: pd.DataFrame, features_df: pd.DataFrame) -> pd.DataFrame:
     """Feature matrix plus log1p cumulative citations through the shared year (see
-    `citations_through_shared_year`), with columns renamed for `smf.ols` formulas.
+    `citations_through_shared_year`), with columns renamed for `smf.ols` via `to_smf_columns`.
 
     Uses the shared-year DV rather than raw `TotalCitations`, which is not comparable across
     articles censused at different times within the same fetch.
@@ -147,11 +159,7 @@ def build_citations_frame(combined: pd.DataFrame, features_df: pd.DataFrame) -> 
     cumulative, _ = citations_through_shared_year(combined)
     citations_df = features_df.copy()
     citations_df["log_citations"] = np.log1p(cumulative)
-    citations_df.columns = citations_df.columns.map(
-        # statsmodels `smf.ols()` api doesn't allow whitespace or `log()` in the formula
-        lambda col: col.lower().replace(" ", "_").replace(".", "").replace(")", "").replace("log(", "log_")
-    )
-    return citations_df
+    return to_smf_columns(citations_df)
 
 
 def _warn_if_stale() -> None:
