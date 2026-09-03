@@ -12,7 +12,7 @@ import pytest
 from helpers import dataset
 from helpers.config import VENUE_IMPACT_METRIC
 from helpers.dataset import (
-    build_citations_frame, build_feature_matrix, citations_since_publication,
+    build_feature_matrix, citations_since_publication,
     citations_through_shared_year, to_smf_columns, weeks_through_shared_year,
 )
 
@@ -167,52 +167,6 @@ class TestToSmfColumns:
         df = pd.DataFrame({"Venue Impact": [1.5, 2.5]})
         result = to_smf_columns(df)
         assert list(result["venue_impact"]) == [1.5, 2.5]
-
-
-class TestCitationsFrame:
-    """`build_citations_frame` renames columns into the exact names the smf formulas use."""
-
-    def _make_combined(self, total_citations):
-        # years must cover through the shared year (2020, from the 2021-06-01 census below)
-        return make_articles(
-            {a: (2018, {2018: c}) for a, c in total_citations.items()},
-            years=range(2018, 2021),
-            last_update={a: "2021-06-01" for a in total_citations},
-            total_citations=total_citations,
-        )
-
-    def test_column_names_match_the_regression_formulas(self):
-        # notebook 03 fits `log_citations ~ C(is_sharing_data) + ... + venue_impact +
-        # log_weeks_since_pub + log_number_of_authors`; if the rename chain drifts, the formula
-        # fails deep inside statsmodels instead of here
-        combined = self._make_combined({"a": 10, "b": 20})
-        features = pd.DataFrame(
-            {
-                "Is Sharing Data": [0, 1],
-                "Sharing Class": ["NONE", "FIXATION"],
-                "Has US Author": [0, 1],
-                "Is Open Access": [1, 1],
-                "Has Preprint": [0, 1],
-                "Venue Impact": [1.5, 2.5],
-                "log(Weeks Since Pub.)": [5.0, 6.0],
-                "log(Number of Authors)": [1.0, 1.4],
-            },
-            index=combined.index,
-        )
-        result = build_citations_frame(combined, features)
-        assert set(result.columns) == {
-            "is_sharing_data", "sharing_class", "has_us_author", "is_open_access",
-            "has_preprint", "venue_impact", "log_weeks_since_pub", "log_number_of_authors",
-            "log_citations",
-        }
-
-    def test_citations_are_log1p_transformed(self):
-        combined = self._make_combined({"a": 0, "b": 9})
-        features = pd.DataFrame({"Venue Impact": [1.0, 2.0]}, index=combined.index)
-        result = build_citations_frame(combined, features)
-        # log1p keeps uncited articles finite, which plain log would not
-        assert result.loc["a", "log_citations"] == 0.0
-        assert np.isclose(result.loc["b", "log_citations"], np.log(10))
 
 
 class TestCitationsThroughSharedYear:

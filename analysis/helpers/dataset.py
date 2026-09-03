@@ -1,6 +1,6 @@
-"""Build (or load from cache) the three dataframes every analysis notebook starts from.
+"""Build (or load from cache) the two dataframes every analysis notebook starts from.
 
-`load_or_build()` is the entry point. It returns the same three frames regardless of which
+`load_or_build()` is the entry point. It returns the same two frames regardless of which
 notebooks have run before it, so each notebook is independently runnable from a cold kernel;
 the parquet cache is purely a speed optimization, never a dependency between notebooks.
 """
@@ -40,7 +40,6 @@ def _prepare_analytical_dataset():
 _CACHE_FILES = {
     "combined": DATA_STORE_DIR / "combined.parquet",
     "features": DATA_STORE_DIR / "features.parquet",
-    "citations": DATA_STORE_DIR / "citations.parquet",
 }
 _SOURCES = (GODWIN_PATH, METADATA_PATH, _DATA_DIR / "prepare_data.py")
 _CITATION_COL_PATTERN = re.compile(r"Citations\d{4}")
@@ -149,19 +148,6 @@ def to_smf_columns(df: pd.DataFrame) -> pd.DataFrame:
     ))
 
 
-def build_citations_frame(combined: pd.DataFrame, features_df: pd.DataFrame) -> pd.DataFrame:
-    """Feature matrix plus log1p cumulative citations through the shared year (see
-    `citations_through_shared_year`), with columns renamed for `smf.ols` via `to_smf_columns`.
-
-    Uses the shared-year DV rather than raw `TotalCitations`, which is not comparable across
-    articles censused at different times within the same fetch.
-    """
-    cumulative, _ = citations_through_shared_year(combined)
-    citations_df = features_df.copy()
-    citations_df["log_citations"] = np.log1p(cumulative)
-    return to_smf_columns(citations_df)
-
-
 def _warn_if_stale() -> None:
     """Print a warning (but do not rebuild) when a source file is newer than the cache."""
     cache_mtime = min(p.stat().st_mtime for p in _CACHE_FILES.values())
@@ -177,8 +163,8 @@ def _warn_if_stale() -> None:
 
 def load_or_build(
         rebuild: bool = False, verbose: bool = True
-) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Return `(combined, features_df, citations_df)`, from the parquet cache when available."""
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Return `(combined, features_df)`, from the parquet cache when available."""
     have_cache = all(p.exists() for p in _CACHE_FILES.values())
     if have_cache and not rebuild:
         try:
@@ -186,24 +172,22 @@ def load_or_build(
             _warn_if_stale()
             if verbose:
                 print(f"Loaded cached dataset from {DATA_STORE_DIR} ({len(frames['combined'])} rows)")
-            return frames["combined"], frames["features"], frames["citations"]
+            return frames["combined"], frames["features"]
         except Exception as err:
             print(f"Cache unreadable ({err.__class__.__name__}: {err}); rebuilding from source.")
 
     combined = build_analytic_sample(verbose=verbose)
     features_df = build_feature_matrix(combined)
-    citations_df = build_citations_frame(combined, features_df)
 
     DATA_STORE_DIR.mkdir(exist_ok=True)
     try:
         combined.to_parquet(_CACHE_FILES["combined"])
         features_df.to_parquet(_CACHE_FILES["features"])
-        citations_df.to_parquet(_CACHE_FILES["citations"])
         if verbose:
             print(f"Wrote dataset cache to {DATA_STORE_DIR}")
     except Exception as err:
         print(f"Could not write cache ({err.__class__.__name__}: {err}); continuing without it.")
-    return combined, features_df, citations_df
+    return combined, features_df
 
 
 def citations_since_publication(articles: pd.DataFrame) -> pd.DataFrame:
