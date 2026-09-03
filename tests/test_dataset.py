@@ -13,7 +13,7 @@ from helpers import dataset
 from helpers.config import VENUE_IMPACT_METRIC
 from helpers.dataset import (
     build_citations_frame, build_feature_matrix, citations_since_publication,
-    citations_through_shared_year, weeks_through_shared_year,
+    citations_through_shared_year, to_smf_columns, weeks_through_shared_year,
 )
 
 
@@ -147,6 +147,26 @@ class TestFeatureMatrix:
         combined = self._make_combined()
         result = build_feature_matrix(combined)
         assert result.loc["a", "log(Weeks Since Pub.)"] > result.loc["b", "log(Weeks Since Pub.)"]
+
+
+class TestToSmfColumns:
+    """`to_smf_columns` - the generic `smf.ols`-safe renamer, shared by any DV-attached frame."""
+
+    def test_spaces_dots_and_parens_are_stripped(self):
+        df = pd.DataFrame(columns=["Is Sharing Data", "log(Weeks Since Pub.)", "Venue Impact"])
+        result = to_smf_columns(df)
+        assert list(result.columns) == ["is_sharing_data", "log_weeks_since_pub", "venue_impact"]
+
+    def test_does_not_mutate_the_input(self):
+        df = pd.DataFrame({"Has US Author": [1]})
+        before = df.copy()
+        to_smf_columns(df)
+        pd.testing.assert_frame_equal(df, before)
+
+    def test_values_are_untouched(self):
+        df = pd.DataFrame({"Venue Impact": [1.5, 2.5]})
+        result = to_smf_columns(df)
+        assert list(result["venue_impact"]) == [1.5, 2.5]
 
 
 class TestCitationsFrame:
