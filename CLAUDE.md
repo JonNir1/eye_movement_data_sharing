@@ -17,7 +17,7 @@ current in-progress revision; `brief report.pdf` is the version that was submitt
 
 ```
 data/       acquisition only - OpenAlex/CrossRef fetching, and _api_secrets.py
-analysis/   six notebooks, one per research question, plus helpers/
+analysis/   seven notebooks, one per research question, plus helpers/
 output/     exported figures
 data_store/ source data AND the derived parquet frames (gitignored)
 ```
@@ -52,9 +52,10 @@ between notebooks.
 | `01_dataset_construction` | What is the corpus, how was it built, and does it match Godwin et al.? |
 | `02_feature_descriptives` | What do the article and impact features look like, overall and by sharing status? |
 | `03_sharing_and_article_features` | Is sharing associated with other article characteristics? |
-| `04_citation_counts` | Do sharing articles accrue more raw citations? |
-| `05_citation_dynamics` | When does the advantage appear, and does it persist? |
-| `06_fwci` | Do sharing articles score higher on field-weighted impact? |
+| `04_citation_descriptives` | What do the citation and impact outcomes look like, overall and by sharing status, before any modelling? |
+| `05_citation_counts` | Do sharing articles accrue more raw citations? |
+| `06_citation_dynamics` | When does the advantage appear, and does it persist? |
+| `07_fwci` | Do sharing articles score higher on field-weighted impact? |
 
 `analysis/helpers/` holds only code that two or more notebooks import (`config`, `dataset`,
 `stats`, `plotting`). Single-notebook helpers stay inline on purpose. There is no
@@ -72,10 +73,10 @@ Results order in the revised manuscript:
 
 1. feature descriptives and appendix figures (nb 02)
 2. sharing status against the other article features (nb 03)
-3. multivariable regression on total citations: age and venue dominate, sharing is null (nb 04)
-4. 3-year cumulative citations on the same covariates, normalizing for age (nb 04/05)
-5. citation dynamics (nb 05)
-6. FWCI (nb 06)
+3. multivariable regression on total citations: age and venue dominate, sharing is null (nb 05)
+4. 3-year cumulative citations on the same covariates, normalizing for age (nb 05/06)
+5. citation dynamics (nb 06)
+6. FWCI (nb 07)
 
 Decisions already taken, each of which needs re-arguing before it is changed:
 
@@ -106,7 +107,7 @@ Still open:
 - **Whether citation dynamics survives as inference.** Year-by-year tests with N falling from
   232 to 83 are the pattern the reviewer objected to. The intended replacement is a single
   longitudinal model (sharing x year interaction, random intercept per article), with the
-  year-by-year plot kept as description. See the TODO at the bottom of nb 05.
+  year-by-year plot kept as description. See the TODO at the bottom of nb 06.
 
 ## Environment
 
