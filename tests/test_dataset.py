@@ -1,5 +1,6 @@
 """Unit tests for `helpers.dataset.citations_since_publication`,
-`helpers.dataset.citations_through_shared_year`, and `helpers.dataset.weeks_through_shared_year`.
+`helpers.dataset.citations_through_shared_year`, `helpers.dataset.weeks_through_shared_year`,
+and `helpers.dataset.fwci_with_zeros_imputed`.
 
 These build small frames by hand rather than loading the corpus: the real data lives in the
 gitignored `data_store/`, and a unit test should not depend on it being present.
@@ -13,7 +14,8 @@ from helpers import dataset
 from helpers.config import VENUE_IMPACT_METRIC
 from helpers.dataset import (
     build_feature_matrix, citations_since_publication,
-    citations_through_shared_year, to_smf_columns, weeks_through_shared_year,
+    citations_through_shared_year, fwci_with_zeros_imputed, to_smf_columns,
+    weeks_through_shared_year,
 )
 
 
@@ -368,3 +370,86 @@ class TestFrozenMetadataGuard:
         snapshot.write_text("", encoding="utf8")
         monkeypatch.setattr(dataset, "METADATA_PATH", snapshot)
         dataset._require_frozen_metadata()   # must not raise
+
+
+class TestFwciWithZerosImputed:
+    """`fwci_with_zeros_imputed` - the Dengler (2024) half-minimum-non-zero-FWCI imputation."""
+
+    def test_per_year_rule_uses_that_years_own_minimum(self):
+        combined = pd.DataFrame(
+            {
+                "PublicationYear": [2018, 2018, 2019, 2019],
+                "FieldWeightedCitationIndex": [0.0, 0.4, 2.0, 0.0],
+            },
+            index=["a", "b", "c", "d"],
+        )
+        result = fwci_with_zeros_imputed(combined)
+        assert result.loc["a"] == pytest.approx(0.2)   # half of 2018's own non-zero minimum, 0.4
+        assert result.loc["d"] == pytest.approx(1.0)   # half of 2019's own non-zero minimum, 2.0
+
+    def test_falls_back_to_global_minimum_when_year_has_no_non_zero_value(self):
+        combined = pd.DataFrame(
+            {
+                "PublicationYear": [2018, 2018, 2019],
+                "FieldWeightedCitationIndex": [0.0, 0.0, 0.6],
+            },
+            index=["a", "b", "c"],
+        )
+        result = fwci_with_zeros_imputed(combined)
+        # 2018 has no non-zero FWCI at all, so both "a" and "b" fall back to the global minimum
+        assert result.loc["a"] == pytest.approx(0.3)
+        assert result.loc["b"] == pytest.approx(0.3)
+
+    def test_non_zero_values_pass_through_untouched(self):
+        combined = pd.DataFrame(
+            {"PublicationYear": [2018, 2019], "FieldWeightedCitationIndex": [1.5, 2.5]},
+            index=["a", "b"],
+        )
+        result = fwci_with_zeros_imputed(combined)
+        assert list(result) == [1.5, 2.5]
+
+    def test_index_and_name_are_set(self):
+        combined = pd.DataFrame(
+            {"PublicationYear": [2018], "FieldWeightedCitationIndex": [1.0]},
+            index=pd.Index(["a"], name="article"),
+        )
+        result = fwci_with_zeros_imputed(combined)
+        assert result.index.name == "article"
+        assert result.name == "fwci_with_zeros_imputed"
+
+    def test_input_is_not_mutated(self):
+        combined = pd.DataFrame(
+            {"PublicationYear": [2018, 2018], "FieldWeightedCitationIndex": [0.0, 0.4]},
+            index=["a", "b"],
+        )
+        before = combined.copy()
+        fwci_with_zeros_imputed(combined)
+        pd.testing.assert_frame_equal(combined, before)
+
+
+class TestFwciWithZerosImputedValidation:
+    def test_raises_without_fwci_column(self):
+        combined = pd.DataFrame({"PublicationYear": [2018]}, index=["a"])
+        with pytest.raises(ValueError, match="FieldWeightedCitationIndex"):
+            fwci_with_zeros_imputed(combined)
+
+    def test_raises_without_publication_year(self):
+        combined = pd.DataFrame({"FieldWeightedCitationIndex": [1.0]}, index=["a"])
+        with pytest.raises(ValueError, match="PublicationYear"):
+            fwci_with_zeros_imputed(combined)
+
+    def test_raises_on_negative_fwci(self):
+        combined = pd.DataFrame(
+            {"PublicationYear": [2018, 2018], "FieldWeightedCitationIndex": [-0.1, 0.4]},
+            index=["a", "b"],
+        )
+        with pytest.raises(ValueError, match="negative"):
+            fwci_with_zeros_imputed(combined)
+
+    def test_raises_when_no_non_zero_value_exists(self):
+        combined = pd.DataFrame(
+            {"PublicationYear": [2018, 2018], "FieldWeightedCitationIndex": [0.0, 0.0]},
+            index=["a", "b"],
+        )
+        with pytest.raises(ValueError, match="non-zero"):
+            fwci_with_zeros_imputed(combined)
