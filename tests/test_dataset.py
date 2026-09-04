@@ -13,7 +13,7 @@ import pytest
 from helpers import dataset
 from helpers.config import VENUE_IMPACT_METRIC
 from helpers.dataset import (
-    build_feature_matrix, citations_since_publication,
+    build_citations_frame, build_feature_matrix, citations_since_publication,
     citations_through_shared_year, fwci_with_zeros_imputed, to_smf_columns,
     weeks_through_shared_year,
 )
@@ -169,6 +169,70 @@ class TestToSmfColumns:
         df = pd.DataFrame({"Venue Impact": [1.5, 2.5]})
         result = to_smf_columns(df)
         assert list(result["venue_impact"]) == [1.5, 2.5]
+
+
+class TestCitationsFrame:
+    """`build_citations_frame` - the shared-year citation DV, renamed for `smf.ols` via
+    `to_smf_columns`. Notebook 04's regression is reported in the manuscript, so this frame's
+    shape, columns, and values must not drift silently."""
+
+    def _make_combined(self, total_citations):
+        # years must cover through the shared year (2020, from the 2021-06-01 census below)
+        return make_articles(
+            {a: (2018, {2018: c}) for a, c in total_citations.items()},
+            years=range(2018, 2021),
+            last_update={a: "2021-06-01" for a in total_citations},
+            total_citations=total_citations,
+        )
+
+    def test_column_names_match_the_regression_formulas(self):
+        # notebook 04 fits `log_citations ~ C(sharing_class) + is_open_access + has_preprint +
+        # has_us_author + venue_impact + log_weeks_since_pub + log_number_of_authors`; if the
+        # rename chain drifts, the formula fails deep inside statsmodels instead of here
+        combined = self._make_combined({"a": 10, "b": 20})
+        features = pd.DataFrame(
+            {
+                "Is Sharing Data": [0, 1],
+                "Sharing Class": ["NONE", "FIXATION"],
+                "Has US Author": [0, 1],
+                "Is Open Access": [1, 1],
+                "Has Preprint": [0, 1],
+                "Venue Impact": [1.5, 2.5],
+                "log(Weeks Since Pub.)": [5.0, 6.0],
+                "log(Number of Authors)": [1.0, 1.4],
+            },
+            index=combined.index,
+        )
+        result = build_citations_frame(combined, features)
+        assert set(result.columns) == {
+            "is_sharing_data", "sharing_class", "has_us_author", "is_open_access",
+            "has_preprint", "venue_impact", "log_weeks_since_pub", "log_number_of_authors",
+            "log_citations",
+        }
+
+    def test_shape_and_index_match_the_feature_matrix(self):
+        combined = self._make_combined({"a": 1, "b": 2, "c": 3})
+        features = pd.DataFrame({"Venue Impact": [1.0, 2.0, 3.0]}, index=combined.index)
+        result = build_citations_frame(combined, features)
+        assert result.shape == (3, 2)   # venue_impact + log_citations
+        assert list(result.index) == ["a", "b", "c"]
+
+    def test_citations_are_log1p_of_the_shared_year_cumulative_count(self):
+        combined = self._make_combined({"a": 0, "b": 9})
+        features = pd.DataFrame({"Venue Impact": [1.0, 2.0]}, index=combined.index)
+        cumulative, _ = citations_through_shared_year(combined)
+        result = build_citations_frame(combined, features)
+        assert np.allclose(result["log_citations"], np.log1p(cumulative))
+        # log1p keeps uncited articles finite, which plain log would not
+        assert result.loc["a", "log_citations"] == 0.0
+        assert np.isclose(result.loc["b", "log_citations"], np.log(10))
+
+    def test_does_not_mutate_the_feature_matrix(self):
+        combined = self._make_combined({"a": 1, "b": 2})
+        features = pd.DataFrame({"Venue Impact": [1.0, 2.0]}, index=combined.index)
+        before = features.copy()
+        build_citations_frame(combined, features)
+        pd.testing.assert_frame_equal(features, before)
 
 
 class TestCitationsThroughSharedYear:

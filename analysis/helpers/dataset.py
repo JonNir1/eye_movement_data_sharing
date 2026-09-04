@@ -148,6 +148,30 @@ def to_smf_columns(df: pd.DataFrame) -> pd.DataFrame:
     ))
 
 
+def build_citations_frame(combined: pd.DataFrame, features_df: pd.DataFrame) -> pd.DataFrame:
+    """Feature matrix plus log1p cumulative citations through the shared year (see
+    `citations_through_shared_year`), with columns renamed for `smf.ols` via `to_smf_columns`.
+
+    Uses the shared-year DV rather than raw `TotalCitations`, which is not comparable across
+    articles censused at different times within the same fetch.
+
+    Never cached, and never called from the build pipeline (`build_feature_matrix()`,
+    `load_or_build()`, or anything else that feeds the parquet cache) - callers invoke this
+    explicitly on already-loaded data, the same convention as `fwci_with_zeros_imputed()`.
+
+    :param combined: frame indexed by article, carrying the columns `citations_through_shared_year`
+        requires (`PublicationYear`, `LastUpdate`, one or more `Citations20XX`, `TotalCitations`).
+    :param features_df: feature matrix aligned to `combined`'s index, typically the output of
+        `build_feature_matrix()`.
+    :return: `features_df` plus a `log_citations` column, with all columns renamed via
+        `to_smf_columns`.
+    """
+    cumulative, _ = citations_through_shared_year(combined)
+    citations_df = features_df.copy()
+    citations_df["log_citations"] = np.log1p(cumulative)
+    return to_smf_columns(citations_df)
+
+
 def _warn_if_stale() -> None:
     """Print a warning (but do not rebuild) when a source file is newer than the cache."""
     cache_mtime = min(p.stat().st_mtime for p in _CACHE_FILES.values())
