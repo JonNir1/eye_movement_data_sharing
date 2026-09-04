@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from helpers.config import SHARING_CLASS_ORDER
 from helpers.stats import _calculate_group_stats, compare_binary, compare_continuous
 
 SHARE_COL = "Is Sharing Data"
@@ -21,6 +22,20 @@ def make_two_groups(non_sharing: list, sharing: list, feature: str = "score") ->
     return pd.DataFrame({
         SHARE_COL: [0] * len(non_sharing) + [1] * len(sharing),
         feature: list(non_sharing) + list(sharing),
+    })
+
+
+def make_sharing_class_pair(
+        earlier_vals: list, later_vals: list, labels: tuple[str, str], feature: str = "score"
+) -> pd.DataFrame:
+    """Two-level `Sharing Class` subset, ordered per `SHARING_CLASS_ORDER`, the shape a
+    notebook-03 post-hoc contrast passes (`labels` must appear in that order, earlier first)."""
+    cats = pd.CategoricalDtype(categories=SHARING_CLASS_ORDER, ordered=True)
+    return pd.DataFrame({
+        "Sharing Class": pd.Series(
+            [labels[0]] * len(earlier_vals) + [labels[1]] * len(later_vals), dtype=cats
+        ),
+        feature: list(earlier_vals) + list(later_vals),
     })
 
 
@@ -204,3 +219,70 @@ class TestSMD:
         })
         out, _ = compare_binary(data=data, share_feature="Sharing Class", tested_feature="Has US Author")
         assert "SMD" not in out["effect_sizes"]
+
+
+class TestGroupCountDispatch:
+    """Regression for the latent dispatch bug: branch selection must key on how many groups are
+    actually present in the data, not on whether `share_feature` looks like "Is Sharing Data".
+    Notebook 03's post-hoc loop calls `compare_continuous` with `share_feature="Sharing Class"`
+    on a subset already narrowed to two levels; that used to fall into the omnibus branch and
+    fail its `len(test_groups) > 2` assertion whenever the post-hoc feature was continuous.
+    """
+
+    def test_two_group_non_sharing_subset_runs_the_pairwise_test(self):
+        # this used to raise: `share_feature="Sharing Class"` routed to the omnibus branch
+        # even though only two groups were present in the data
+        rng = np.random.default_rng(6)
+        data = make_sharing_class_pair(
+            rng.normal(0, 1, 20), rng.normal(0.5, 1, 20), labels=("TRIAL", "FIXATION")
+        )
+        out, _ = compare_continuous(
+            data=data, share_feature="Sharing Class", tested_feature="score", alternative="two-sided"
+        )
+        assert out["test"] in ("t", "MW_U")
+
+    def test_three_group_call_still_routes_to_omnibus(self):
+        rng = np.random.default_rng(7)
+        data = pd.DataFrame({
+            "Sharing Class": pd.Series(
+                ["NONE"] * 20 + ["TRIAL"] * 20 + ["FIXATION"] * 20,
+                dtype=pd.CategoricalDtype(categories=SHARING_CLASS_ORDER, ordered=True),
+            ),
+            "score": np.concatenate([rng.normal(0, 1, 20), rng.normal(0.3, 1, 20), rng.normal(0.6, 1, 20)]),
+        })
+        out, _ = compare_continuous(
+            data=data, share_feature="Sharing Class", tested_feature="score", alternative="two-sided"
+        )
+        assert out["test"] in ("ANOVA", "KW")
+
+    def test_fewer_than_two_groups_fails_with_a_clear_message(self):
+        data = pd.DataFrame({
+            "Sharing Class": pd.Series(
+                ["TRIAL"] * 10, dtype=pd.CategoricalDtype(categories=SHARING_CLASS_ORDER, ordered=True)
+            ),
+            "score": np.arange(10, dtype=float),
+        })
+        with pytest.raises(AssertionError, match="need at least 2"):
+            compare_continuous(
+                data=data, share_feature="Sharing Class", tested_feature="score", alternative="two-sided"
+            )
+
+    def test_direction_convention_holds_for_a_non_sharing_contrast(self):
+        # `SHARING_CLASS_ORDER` puts TRIAL before FIXATION, so effect sizes should read
+        # "FIXATION relative to TRIAL", the same "later relative to earlier" rule that
+        # `Is Sharing Data` follows in `TestEffectSizeDirection`.
+        rng = np.random.default_rng(8)
+        higher, lower = rng.normal(3, 1, 40), rng.normal(0, 1, 40)
+
+        fixation_higher, _ = compare_continuous(
+            data=make_sharing_class_pair(lower, higher, labels=("TRIAL", "FIXATION")),
+            share_feature="Sharing Class", tested_feature="score", alternative="two-sided",
+        )
+        fixation_lower, _ = compare_continuous(
+            data=make_sharing_class_pair(higher, lower, labels=("TRIAL", "FIXATION")),
+            share_feature="Sharing Class", tested_feature="score", alternative="two-sided",
+        )
+
+        assert fixation_higher["effect_sizes"]["CLES"] > 0.5
+        assert fixation_lower["effect_sizes"]["CLES"] < 0.5
+        assert fixation_higher["statistic"] > 0 > fixation_lower["statistic"]
