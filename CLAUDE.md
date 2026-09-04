@@ -158,7 +158,9 @@ changing the text too.
   with the original curation.
 - **FWCI** is the primary impact metric, preferred over the h-index (which is confounded by
   total output and career length). The five articles with FWCI = 0 are imputed per
-  Dengler (2024) — half the minimum non-zero FWCI in the same year — and then log-transformed.
+  Dengler (2024) — half the minimum non-zero FWCI in the same year — via
+  `helpers.dataset.fwci_with_zeros_imputed()`, then log-transformed. That imputation is applied
+  at analysis time, on already-loaded data, and deliberately never baked into the parquet cache.
 - **Transformations**: `log(citations + 1)`, `log(weeks)`, `log(n_authors)` (skew 1.41 → 0.14).
   Venue two-year mean citedness stays on its native scale; logging over-corrects it
   (skew 0.39 → -1.01).
