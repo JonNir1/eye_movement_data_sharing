@@ -38,6 +38,8 @@ def compare_binary(
         a, b, c, d = contingency_table.to_numpy().ravel()
         effect_sizes["Odds Ratio"] = (a * d) / (b * c) if b and c else np.nan
         effect_sizes["Pearson phi"] = (a*d - b*c) / np.sqrt((a+b)*(c+d)*(a+c)*(b+d))    # Pearson's phi coefficient
+        # row 1 over row 0, matching the Odds Ratio direction above.
+        effect_sizes["SMD"] = _smd_binary(p_a=d / (c + d), p_b=b / (a + b))
     else:
         effect_sizes["Cramer V"] = stats.contingency.association(contingency_table, method="cramer")
     if verbose:
@@ -68,9 +70,9 @@ def compare_continuous(
     test_groups = _extract_grouped_data(data, share_feature, tested_feature)
     group_stats = _calculate_group_stats(test_groups, share_feature)
     all_normal = _check_all_normal(test_groups, min_size=min_parametric_size, verbose=verbose)
+    group_values = list(test_groups.values())
     if share_feature.lower() in ("is sharing data", "issharingdata", "is_sharing_data"):
         assert len(test_groups) == 2, f"`test_groups` contains {len(test_groups)} groups, expected 2"
-        group_values = list(test_groups.values())
         # `_extract_grouped_data()` returns groups in ascending order, i.e. [non-sharing (0), sharing (1)].
         # SHARING must be passed first: pingouin treats the first argument as the focal group, so this makes
         # the effect sizes (Cohen's d, RBC, CLES) read "sharing relative to non-sharing", matching the
@@ -84,7 +86,22 @@ def compare_continuous(
     else:
         assert len(test_groups) > 2, f"`test_groups` contains {len(test_groups)} groups, expected more than 2"
         out = _oneway_anova(data, share_feature, tested_feature) if all_normal else _kruskal_wallis(data, share_feature, tested_feature)
+    # SMD is pairwise: report it for every two-group contrast (keyed on the group count actually
+    # present, not on `share_feature`, since these helpers also run on two-group subsets of
+    # `Sharing Class` for post-hoc tests), and omit it for the >2-group omnibus tests above.
+    if len(group_values) == 2:
+        out["effect_sizes"]["SMD"] = _smd_continuous(group_values[1], group_values[0])
     return out, group_stats
+
+
+def _smd_continuous(a: pd.Series, b: pd.Series) -> float:
+    """Standardized mean difference: (mean_a - mean_b) / pooled SD, sample variance (ddof=1)."""
+    return (a.mean() - b.mean()) / np.sqrt((a.var(ddof=1) + b.var(ddof=1)) / 2)
+
+
+def _smd_binary(p_a: float, p_b: float) -> float:
+    """Standardized mean difference between two proportions, on the same scale as `_smd_continuous`."""
+    return (p_a - p_b) / np.sqrt((p_a * (1 - p_a) + p_b * (1 - p_b)) / 2)
 
 
 def _extract_grouped_data(
