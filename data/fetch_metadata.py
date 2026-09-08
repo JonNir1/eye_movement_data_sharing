@@ -8,12 +8,31 @@ import pandas as pd
 from pyalex.api import QueryError
 from tqdm import tqdm
 
-from _api_secrets import *
-
-
-pyalex.config.email = EMAIL
-pyalex.config.api_key = OPENALEX_API_KEY
 DOI_PATTERN = r'(10\.\d{4,9}/[-._;()/:a-zA-Z0-9]+)'
+
+_is_api_configured = False
+
+
+def _configure_api() -> str:
+    """Load API credentials and point `pyalex` at them, once, on first network use.
+
+    `_api_secrets` is imported here rather than at module scope so that importing this module
+    does not require credentials to be present. The preparation layer imports it to reach
+    `fetch_all_metadata`, and the analysis layer reaches the preparation layer in turn, so a
+    module-scope import made a warm-cache run impossible without an `_api_secrets.py`. Only the
+    code paths that actually query OpenAlex or CrossRef need it, and they all go through one of
+    the three entry points that call this.
+
+    :return: the contact email, which CrossRef expects as a `mailto` parameter.
+    """
+    global _is_api_configured
+    from _api_secrets import EMAIL, OPENALEX_API_KEY
+
+    if not _is_api_configured:
+        pyalex.config.email = EMAIL
+        pyalex.config.api_key = OPENALEX_API_KEY
+        _is_api_configured = True
+    return EMAIL
 
 
 def fetch_all_metadata(
@@ -23,6 +42,7 @@ def fetch_all_metadata(
         sleep_period=0.01,
         verbose=True,
 ) -> pd.DataFrame:
+    _configure_api()
     if sleep_period < 0:
         raise ValueError("sleep_period must be non-negative.")
     results = []
@@ -49,6 +69,7 @@ def fetch_all_metadata(
 
 
 def fetch_single_metadata(link: str, title: str, idx, venue_cache: Optional[dict] = None, verbose=True) -> dict:
+    _configure_api()
     venue_cache = venue_cache if venue_cache is not None else {}
     result = dict()
     try:
@@ -123,6 +144,7 @@ def fetch_covariates_by_id(
     DataFrame indexed like ``openalex_ids``. Keying off the cached id (rather than re-matching by
     link/title) guarantees the covariates describe the same work as previously-fetched citation data.
     """
+    _configure_api()
     venue_cache = {}
     records = []
     for openalex_id in tqdm(openalex_ids, disable=not verbose):
@@ -225,7 +247,7 @@ def _crossref_has_preprint(doi: Optional[str]) -> bool:
         return False
     try:
         resp = requests.get(f"https://api.crossref.org/works/{doi_match.group(1)}",
-                            params={"mailto": EMAIL}, timeout=20)
+                            params={"mailto": _configure_api()}, timeout=20)
         if resp.status_code != 200:
             return False
         relation = resp.json().get("message", {}).get("relation", {}) or {}

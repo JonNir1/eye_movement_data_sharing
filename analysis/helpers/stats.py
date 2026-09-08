@@ -38,6 +38,8 @@ def compare_binary(
         a, b, c, d = contingency_table.to_numpy().ravel()
         effect_sizes["Odds Ratio"] = (a * d) / (b * c) if b and c else np.nan
         effect_sizes["Pearson phi"] = (a*d - b*c) / np.sqrt((a+b)*(c+d)*(a+c)*(b+d))    # Pearson's phi coefficient
+        # row 1 over row 0, matching the Odds Ratio direction above.
+        effect_sizes["SMD"] = _smd_binary(p_a=d / (c + d), p_b=b / (a + b))
     else:
         effect_sizes["Cramer V"] = stats.contingency.association(contingency_table, method="cramer")
     if verbose:
@@ -62,29 +64,57 @@ def compare_continuous(
         min_parametric_size: int = 15,
         verbose: bool = False,
 ) -> tuple[dict, pd.DataFrame]:
+    """Compare `tested_feature` across the groups of `share_feature`.
+
+    Dispatch is on how many groups are actually present in `data`, not on the name of
+    `share_feature`: 2 groups get the pairwise test (t-test or Mann-Whitney), more than 2 get
+    the omnibus test (one-way ANOVA or Kruskal-Wallis), chosen in both cases by the same
+    normality check. This also covers post-hoc contrasts, e.g. calling this with
+    `share_feature="Sharing Class"` on data already subset to two of its levels.
+
+    Direction convention: `_extract_grouped_data()` returns groups in ascending / declared-
+    category order, and every reported effect size (Cohen's d, rank-biserial, CLES, SMD) reads
+    "later category relative to earlier category" in that order. For `Is Sharing Data` that
+    order is [non-sharing (0), sharing (1)], so results read "sharing relative to non-sharing",
+    matching the OR / phi convention in `compare_binary()`, and `alternative="greater"` tests
+    "sharing > non-sharing". For `Sharing Class` the order is the declared categorical order in
+    `helpers.config.SHARING_CLASS_ORDER` (NONE < PARTICIPANT < TRIAL < FIXATION), so e.g. a
+    FIXATION-vs-TRIAL post-hoc reads "FIXATION relative to TRIAL".
+    """
     assert share_feature in data.columns, f"dataset missing `{share_feature}` column"
     assert tested_feature in data.columns, f"dataset missing `{tested_feature}` column"
     assert tested_feature not in BINARY_FEATURES, f"feature `{tested_feature}` is binary, use `compare_binary()`."
     test_groups = _extract_grouped_data(data, share_feature, tested_feature)
     group_stats = _calculate_group_stats(test_groups, share_feature)
     all_normal = _check_all_normal(test_groups, min_size=min_parametric_size, verbose=verbose)
-    if share_feature.lower() in ("is sharing data", "issharingdata", "is_sharing_data"):
-        assert len(test_groups) == 2, f"`test_groups` contains {len(test_groups)} groups, expected 2"
-        group_values = list(test_groups.values())
-        # `_extract_grouped_data()` returns groups in ascending order, i.e. [non-sharing (0), sharing (1)].
-        # SHARING must be passed first: pingouin treats the first argument as the focal group, so this makes
-        # the effect sizes (Cohen's d, RBC, CLES) read "sharing relative to non-sharing", matching the
-        # OR / phi convention in `compare_binary()`. It also makes `alternative="greater"` test
-        # "sharing > non-sharing", which is the direction of the research hypothesis.
-        non_sharing, sharing = group_values[0], group_values[1]
+    group_values = list(test_groups.values())
+    n_groups = len(group_values)
+    assert n_groups >= 2, f"`test_groups` contains {n_groups} groups, need at least 2 to compare"
+    if n_groups == 2:
+        # The later group must be passed first: pingouin treats the first argument as the focal
+        # group, so this makes the effect sizes (Cohen's d, RBC, CLES) read "later relative to
+        # earlier" per the direction convention in the docstring above.
+        earlier, later = group_values[0], group_values[1]
         out = (
-            _independent_t_test(sharing, non_sharing, alternative) if all_normal
-            else _mann_whitney(sharing, non_sharing, alternative)
+            _independent_t_test(later, earlier, alternative) if all_normal
+            else _mann_whitney(later, earlier, alternative)
         )
+        # SMD is pairwise, so only the 2-group branch reports it; the >2-group omnibus tests
+        # below have no single reference pair to compute it against.
+        out["effect_sizes"]["SMD"] = _smd_continuous(later, earlier)
     else:
-        assert len(test_groups) > 2, f"`test_groups` contains {len(test_groups)} groups, expected more than 2"
         out = _oneway_anova(data, share_feature, tested_feature) if all_normal else _kruskal_wallis(data, share_feature, tested_feature)
     return out, group_stats
+
+
+def _smd_continuous(a: pd.Series, b: pd.Series) -> float:
+    """Standardized mean difference: (mean_a - mean_b) / pooled SD, sample variance (ddof=1)."""
+    return (a.mean() - b.mean()) / np.sqrt((a.var(ddof=1) + b.var(ddof=1)) / 2)
+
+
+def _smd_binary(p_a: float, p_b: float) -> float:
+    """Standardized mean difference between two proportions, on the same scale as `_smd_continuous`."""
+    return (p_a - p_b) / np.sqrt((p_a * (1 - p_a) + p_b * (1 - p_b)) / 2)
 
 
 def _extract_grouped_data(

@@ -148,6 +148,30 @@ def to_smf_columns(df: pd.DataFrame) -> pd.DataFrame:
     ))
 
 
+def build_citations_frame(combined: pd.DataFrame, features_df: pd.DataFrame) -> pd.DataFrame:
+    """Feature matrix plus log1p cumulative citations through the shared year (see
+    `citations_through_shared_year`), with columns renamed for `smf.ols` via `to_smf_columns`.
+
+    Uses the shared-year DV rather than raw `TotalCitations`, which is not comparable across
+    articles censused at different times within the same fetch.
+
+    Never cached, and never called from the build pipeline (`build_feature_matrix()`,
+    `load_or_build()`, or anything else that feeds the parquet cache) - callers invoke this
+    explicitly on already-loaded data, the same convention as `fwci_with_zeros_imputed()`.
+
+    :param combined: frame indexed by article, carrying the columns `citations_through_shared_year`
+        requires (`PublicationYear`, `LastUpdate`, one or more `Citations20XX`, `TotalCitations`).
+    :param features_df: feature matrix aligned to `combined`'s index, typically the output of
+        `build_feature_matrix()`.
+    :return: `features_df` plus a `log_citations` column, with all columns renamed via
+        `to_smf_columns`.
+    """
+    cumulative, _ = citations_through_shared_year(combined)
+    citations_df = features_df.copy()
+    citations_df["log_citations"] = np.log1p(cumulative)
+    return to_smf_columns(citations_df)
+
+
 def _warn_if_stale() -> None:
     """Print a warning (but do not rebuild) when a source file is newer than the cache."""
     cache_mtime = min(p.stat().st_mtime for p in _CACHE_FILES.values())
@@ -373,3 +397,50 @@ def weeks_through_shared_year(articles: pd.DataFrame) -> Tuple[pd.Series, int]:
         )
 
     return weeks, shared_year
+
+
+def fwci_with_zeros_imputed(combined: pd.DataFrame) -> pd.Series:
+    """`FieldWeightedCitationIndex` with its exact-zero values imputed, per Dengler (2024): each
+    zero is replaced by half the minimum non-zero FWCI among articles sharing its
+    `PublicationYear`, or half the global minimum non-zero FWCI when that year has no non-zero
+    value at all.
+
+    Dengler, J. (2024). Determinants of citation impact. Vegetation Classification and Survey,
+    5, 169-177.
+
+    Never cached, and never called from the build pipeline (`build_feature_matrix()`,
+    `load_or_build()`, or anything else that feeds the parquet cache). Callers invoke this
+    explicitly on already-loaded data. Baking the imputed values into the cache would hide which
+    rule produced them behind a stale file and turn a future change to the rule into a
+    cache-invalidating edit instead of a code edit; kept standalone, the imputation in force is
+    always visible at the point of use.
+
+    :param combined: frame indexed by article, carrying `FieldWeightedCitationIndex` and
+        `PublicationYear`.
+    :return: Series indexed like `combined`, named `fwci_with_zeros_imputed`.
+    :raises ValueError: if `FieldWeightedCitationIndex` or `PublicationYear` is missing, if any
+        FWCI value is negative, or if the frame has no non-zero FWCI value to impute from.
+    """
+    for required in ("FieldWeightedCitationIndex", "PublicationYear"):
+        if required not in combined.columns:
+            raise ValueError(f"`{required}` column is required to impute zero FWCI values")
+
+    fwci = combined["FieldWeightedCitationIndex"]
+    if (fwci < 0).any():
+        raise ValueError("`FieldWeightedCitationIndex` has negative value(s); cannot impute")
+
+    non_zero = fwci.loc[fwci > 0]
+    if non_zero.empty:
+        raise ValueError("no non-zero `FieldWeightedCitationIndex` value to impute zeros from")
+
+    global_floor = non_zero.min() / 2
+    year_floor = non_zero.groupby(combined.loc[non_zero.index, "PublicationYear"]).min() / 2
+
+    is_zero = fwci == 0
+    imputed = combined.loc[is_zero, "PublicationYear"].map(year_floor).fillna(global_floor)
+
+    result = fwci.copy()
+    result.loc[is_zero] = imputed
+    result = result.rename("fwci_with_zeros_imputed")
+    result.index.name = combined.index.name
+    return result

@@ -17,7 +17,7 @@ current in-progress revision; `brief report.pdf` is the version that was submitt
 
 ```
 data/       acquisition only - OpenAlex/CrossRef fetching, and _api_secrets.py
-analysis/   six notebooks, one per research question, plus helpers/
+analysis/   seven notebooks, one per research question, plus helpers/
 output/     exported figures
 data_store/ source data AND the derived parquet frames (gitignored)
 ```
@@ -52,9 +52,10 @@ between notebooks.
 | `01_dataset_construction` | What is the corpus, how was it built, and does it match Godwin et al.? |
 | `02_feature_descriptives` | What do the article and impact features look like, overall and by sharing status? |
 | `03_sharing_and_article_features` | Is sharing associated with other article characteristics? |
-| `04_citation_counts` | Do sharing articles accrue more raw citations? |
-| `05_citation_dynamics` | When does the advantage appear, and does it persist? |
-| `06_fwci` | Do sharing articles score higher on field-weighted impact? |
+| `04_citation_descriptives` | What do the citation and impact outcomes look like, overall and by sharing status, before any modelling? |
+| `05_citation_counts` | Do sharing articles accrue more raw citations? |
+| `06_citation_dynamics` | When does the advantage appear, and does it persist? |
+| `07_fwci` | Do sharing articles score higher on field-weighted impact? |
 
 `analysis/helpers/` holds only code that two or more notebooks import (`config`, `dataset`,
 `stats`, `plotting`). Single-notebook helpers stay inline on purpose. There is no
@@ -72,10 +73,10 @@ Results order in the revised manuscript:
 
 1. feature descriptives and appendix figures (nb 02)
 2. sharing status against the other article features (nb 03)
-3. multivariable regression on total citations: age and venue dominate, sharing is null (nb 04)
-4. 3-year cumulative citations on the same covariates, normalizing for age (nb 04/05)
-5. citation dynamics (nb 05)
-6. FWCI (nb 06)
+3. multivariable regression on total citations: age and venue dominate, sharing is null (nb 05)
+4. 3-year cumulative citations on the same covariates, normalizing for age (nb 05/06)
+5. citation dynamics (nb 06)
+6. FWCI (nb 07)
 
 Decisions already taken, each of which needs re-arguing before it is changed:
 
@@ -106,7 +107,7 @@ Still open:
 - **Whether citation dynamics survives as inference.** Year-by-year tests with N falling from
   232 to 83 are the pattern the reviewer objected to. The intended replacement is a single
   longitudinal model (sharing x year interaction, random intercept per article), with the
-  year-by-year plot kept as description. See the TODO at the bottom of nb 05.
+  year-by-year plot kept as description. See the TODO at the bottom of nb 06.
 
 ## Environment
 
@@ -123,6 +124,26 @@ notebook's own directory first on `sys.path`, which is the whole reason `from he
 import ...` resolves with no path setup in the notebooks. Note this puts `analysis/` on
 the path, not the project root, so `from analysis.helpers import ...` does *not* work.
 
+That is not a style preference, it is the only arrangement that works. `helpers/` imports itself
+absolutely (`from helpers.config import ...`), so `analysis/` has to be on the path; adding the
+project root as well is what the `analysis.`-prefixed form would require, and depending on both
+means the notebooks only run where something injects both. They had drifted to that form and
+failed on the first cell from a plain kernel, in PyCharm as well as headless. Keep every notebook
+import relative to `analysis/`.
+
+To execute notebooks in batch, run this from `analysis/` with the project venv's interpreter
+(spell out the absolute path to it; `analysis/` sits at a different depth in a worktree than in
+the main checkout, so a relative path is not portable between them):
+
+```bash
+python -m nbconvert --to notebook --execute --inplace --ExecutePreprocessor.timeout=900 02_feature_descriptives.ipynb
+```
+
+Order does not matter, since each notebook runs standalone from a cold kernel. One caveat:
+notebooks 05, 06 and 07 call `fig.show()` with the renderer set to `"browser"`, which opens a tab
+per figure. For an unattended run, put a `sitecustomize.py` that no-ops `webbrowser.open` on
+`PYTHONPATH` rather than editing the notebooks.
+
 Figure exports are individually gated behind `if False:` blocks calling `save_figure()`; flip the one figure you want to re-export.
 
 **`data_store/Godwin_2025_metadata.csv` is a frozen OpenAlex snapshot and is gitignored.** Every
@@ -134,6 +155,17 @@ so a wholesale `data_store/` delete would take the backup with it.)
 
 Analysis code does not need API credentials: `helpers.dataset` imports the acquisition layer
 lazily, so a warm cache runs with no `_api_secrets.py` present at all.
+
+That invariant holds for the whole repo, including notebook 01 and `tests/test_corpus.py`, which
+both reach `prepare_data` and through it `fetch_metadata`. What keeps it true is that
+`fetch_metadata` does **not** import `_api_secrets` at module scope. Credentials are loaded, and
+`pyalex` configured, by `_configure_api()` on first network use. It is called from the three entry
+points (`fetch_all_metadata`, `fetch_single_metadata`, `fetch_covariates_by_id`), which is
+sufficient because every other network helper in that module is reachable only through them.
+
+Adding a module-scope `from _api_secrets import ...` back, or a new network entry point that does
+not call `_configure_api()` first, breaks this. In the second case `pyalex` would run unconfigured
+rather than failing loudly, so a new entry point must call it.
 
 ## Sample construction
 
@@ -158,10 +190,12 @@ changing the text too.
   with the original curation.
 - **FWCI** is the primary impact metric, preferred over the h-index (which is confounded by
   total output and career length). The five articles with FWCI = 0 are imputed per
-  Dengler (2024) — half the minimum non-zero FWCI in the same year — and then log-transformed.
-- **Transformations**: `log(citations + 1)`, `log(weeks)`, `log(n_authors)` (skew 1.41 → 0.14).
+  Dengler (2024) — half the minimum non-zero FWCI in the same year — via
+  `helpers.dataset.fwci_with_zeros_imputed()`, then log-transformed. That imputation is applied
+  at analysis time, on already-loaded data, and deliberately never baked into the parquet cache.
+- **Transformations**: `log(citations + 1)`, `log(weeks)`, `log(n_authors)` (skew 1.39 → 0.14).
   Venue two-year mean citedness stays on its native scale; logging over-corrects it
-  (skew 0.39 → -1.01).
+  (skew 0.38 → -0.97).
 - **Journal impact** uses OpenAlex "two-year mean citedness" as a JIF proxy, since the
   official JIF is proprietary to Clarivate. OpenAlex serves no historical journal metrics,
   so these are *current* values, not values as of each article's publication — that caveat

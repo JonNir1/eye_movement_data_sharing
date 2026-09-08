@@ -1,5 +1,6 @@
 """Unit tests for `helpers.dataset.citations_since_publication`,
-`helpers.dataset.citations_through_shared_year`, and `helpers.dataset.weeks_through_shared_year`.
+`helpers.dataset.citations_through_shared_year`, `helpers.dataset.weeks_through_shared_year`,
+and `helpers.dataset.fwci_with_zeros_imputed`.
 
 These build small frames by hand rather than loading the corpus: the real data lives in the
 gitignored `data_store/`, and a unit test should not depend on it being present.
@@ -12,8 +13,9 @@ import pytest
 from helpers import dataset
 from helpers.config import VENUE_IMPACT_METRIC
 from helpers.dataset import (
-    build_feature_matrix, citations_since_publication,
-    citations_through_shared_year, to_smf_columns, weeks_through_shared_year,
+    build_citations_frame, build_feature_matrix, citations_since_publication,
+    citations_through_shared_year, fwci_with_zeros_imputed, to_smf_columns,
+    weeks_through_shared_year,
 )
 
 
@@ -167,6 +169,70 @@ class TestToSmfColumns:
         df = pd.DataFrame({"Venue Impact": [1.5, 2.5]})
         result = to_smf_columns(df)
         assert list(result["venue_impact"]) == [1.5, 2.5]
+
+
+class TestCitationsFrame:
+    """`build_citations_frame` - the shared-year citation DV, renamed for `smf.ols` via
+    `to_smf_columns`. Notebook 04's regression is reported in the manuscript, so this frame's
+    shape, columns, and values must not drift silently."""
+
+    def _make_combined(self, total_citations):
+        # years must cover through the shared year (2020, from the 2021-06-01 census below)
+        return make_articles(
+            {a: (2018, {2018: c}) for a, c in total_citations.items()},
+            years=range(2018, 2021),
+            last_update={a: "2021-06-01" for a in total_citations},
+            total_citations=total_citations,
+        )
+
+    def test_column_names_match_the_regression_formulas(self):
+        # notebook 04 fits `log_citations ~ C(sharing_class) + is_open_access + has_preprint +
+        # has_us_author + venue_impact + log_weeks_since_pub + log_number_of_authors`; if the
+        # rename chain drifts, the formula fails deep inside statsmodels instead of here
+        combined = self._make_combined({"a": 10, "b": 20})
+        features = pd.DataFrame(
+            {
+                "Is Sharing Data": [0, 1],
+                "Sharing Class": ["NONE", "FIXATION"],
+                "Has US Author": [0, 1],
+                "Is Open Access": [1, 1],
+                "Has Preprint": [0, 1],
+                "Venue Impact": [1.5, 2.5],
+                "log(Weeks Since Pub.)": [5.0, 6.0],
+                "log(Number of Authors)": [1.0, 1.4],
+            },
+            index=combined.index,
+        )
+        result = build_citations_frame(combined, features)
+        assert set(result.columns) == {
+            "is_sharing_data", "sharing_class", "has_us_author", "is_open_access",
+            "has_preprint", "venue_impact", "log_weeks_since_pub", "log_number_of_authors",
+            "log_citations",
+        }
+
+    def test_shape_and_index_match_the_feature_matrix(self):
+        combined = self._make_combined({"a": 1, "b": 2, "c": 3})
+        features = pd.DataFrame({"Venue Impact": [1.0, 2.0, 3.0]}, index=combined.index)
+        result = build_citations_frame(combined, features)
+        assert result.shape == (3, 2)   # venue_impact + log_citations
+        assert list(result.index) == ["a", "b", "c"]
+
+    def test_citations_are_log1p_of_the_shared_year_cumulative_count(self):
+        combined = self._make_combined({"a": 0, "b": 9})
+        features = pd.DataFrame({"Venue Impact": [1.0, 2.0]}, index=combined.index)
+        cumulative, _ = citations_through_shared_year(combined)
+        result = build_citations_frame(combined, features)
+        assert np.allclose(result["log_citations"], np.log1p(cumulative))
+        # log1p keeps uncited articles finite, which plain log would not
+        assert result.loc["a", "log_citations"] == 0.0
+        assert np.isclose(result.loc["b", "log_citations"], np.log(10))
+
+    def test_does_not_mutate_the_feature_matrix(self):
+        combined = self._make_combined({"a": 1, "b": 2})
+        features = pd.DataFrame({"Venue Impact": [1.0, 2.0]}, index=combined.index)
+        before = features.copy()
+        build_citations_frame(combined, features)
+        pd.testing.assert_frame_equal(features, before)
 
 
 class TestCitationsThroughSharedYear:
@@ -368,3 +434,86 @@ class TestFrozenMetadataGuard:
         snapshot.write_text("", encoding="utf8")
         monkeypatch.setattr(dataset, "METADATA_PATH", snapshot)
         dataset._require_frozen_metadata()   # must not raise
+
+
+class TestFwciWithZerosImputed:
+    """`fwci_with_zeros_imputed` - the Dengler (2024) half-minimum-non-zero-FWCI imputation."""
+
+    def test_per_year_rule_uses_that_years_own_minimum(self):
+        combined = pd.DataFrame(
+            {
+                "PublicationYear": [2018, 2018, 2019, 2019],
+                "FieldWeightedCitationIndex": [0.0, 0.4, 2.0, 0.0],
+            },
+            index=["a", "b", "c", "d"],
+        )
+        result = fwci_with_zeros_imputed(combined)
+        assert result.loc["a"] == pytest.approx(0.2)   # half of 2018's own non-zero minimum, 0.4
+        assert result.loc["d"] == pytest.approx(1.0)   # half of 2019's own non-zero minimum, 2.0
+
+    def test_falls_back_to_global_minimum_when_year_has_no_non_zero_value(self):
+        combined = pd.DataFrame(
+            {
+                "PublicationYear": [2018, 2018, 2019],
+                "FieldWeightedCitationIndex": [0.0, 0.0, 0.6],
+            },
+            index=["a", "b", "c"],
+        )
+        result = fwci_with_zeros_imputed(combined)
+        # 2018 has no non-zero FWCI at all, so both "a" and "b" fall back to the global minimum
+        assert result.loc["a"] == pytest.approx(0.3)
+        assert result.loc["b"] == pytest.approx(0.3)
+
+    def test_non_zero_values_pass_through_untouched(self):
+        combined = pd.DataFrame(
+            {"PublicationYear": [2018, 2019], "FieldWeightedCitationIndex": [1.5, 2.5]},
+            index=["a", "b"],
+        )
+        result = fwci_with_zeros_imputed(combined)
+        assert list(result) == [1.5, 2.5]
+
+    def test_index_and_name_are_set(self):
+        combined = pd.DataFrame(
+            {"PublicationYear": [2018], "FieldWeightedCitationIndex": [1.0]},
+            index=pd.Index(["a"], name="article"),
+        )
+        result = fwci_with_zeros_imputed(combined)
+        assert result.index.name == "article"
+        assert result.name == "fwci_with_zeros_imputed"
+
+    def test_input_is_not_mutated(self):
+        combined = pd.DataFrame(
+            {"PublicationYear": [2018, 2018], "FieldWeightedCitationIndex": [0.0, 0.4]},
+            index=["a", "b"],
+        )
+        before = combined.copy()
+        fwci_with_zeros_imputed(combined)
+        pd.testing.assert_frame_equal(combined, before)
+
+
+class TestFwciWithZerosImputedValidation:
+    def test_raises_without_fwci_column(self):
+        combined = pd.DataFrame({"PublicationYear": [2018]}, index=["a"])
+        with pytest.raises(ValueError, match="FieldWeightedCitationIndex"):
+            fwci_with_zeros_imputed(combined)
+
+    def test_raises_without_publication_year(self):
+        combined = pd.DataFrame({"FieldWeightedCitationIndex": [1.0]}, index=["a"])
+        with pytest.raises(ValueError, match="PublicationYear"):
+            fwci_with_zeros_imputed(combined)
+
+    def test_raises_on_negative_fwci(self):
+        combined = pd.DataFrame(
+            {"PublicationYear": [2018, 2018], "FieldWeightedCitationIndex": [-0.1, 0.4]},
+            index=["a", "b"],
+        )
+        with pytest.raises(ValueError, match="negative"):
+            fwci_with_zeros_imputed(combined)
+
+    def test_raises_when_no_non_zero_value_exists(self):
+        combined = pd.DataFrame(
+            {"PublicationYear": [2018, 2018], "FieldWeightedCitationIndex": [0.0, 0.0]},
+            index=["a", "b"],
+        )
+        with pytest.raises(ValueError, match="non-zero"):
+            fwci_with_zeros_imputed(combined)
