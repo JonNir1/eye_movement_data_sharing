@@ -156,16 +156,16 @@ so a wholesale `data_store/` delete would take the backup with it.)
 Analysis code does not need API credentials: `helpers.dataset` imports the acquisition layer
 lazily, so a warm cache runs with no `_api_secrets.py` present at all.
 
-That invariant holds for the whole repo, including notebook 01 and `tests/test_corpus.py`, both of
-which reach `prepare_data`. Two things keep it true, and both are load-bearing:
+That invariant holds for the whole repo, including notebook 01 and `tests/test_corpus.py`, which
+both reach `prepare_data` and through it `fetch_metadata`. What keeps it true is that
+`fetch_metadata` does **not** import `_api_secrets` at module scope. Credentials are loaded, and
+`pyalex` configured, by `_configure_api()` on first network use. It is called from the three entry
+points (`fetch_all_metadata`, `fetch_single_metadata`, `fetch_covariates_by_id`), which is
+sufficient because every other network helper in that module is reachable only through them.
 
-- `prepare_data` imports `fetch_metadata` **inside** `_load_or_fetch_metadata()`, not at module
-  scope, so only the code path that actually queries OpenAlex pulls in credentials.
-- `DOI_PATTERN` lives in `data/doi.py` rather than in `fetch_metadata`, so DOI parsing does not
-  drag the acquisition layer in behind it. That is the only reason `data/doi.py` exists.
-
-Move either one back and notebook 01 stops running without an `_api_secrets.py`, which is how it
-was until this was fixed.
+Adding a module-scope `from _api_secrets import ...` back, or a new network entry point that does
+not call `_configure_api()` first, breaks this. In the second case `pyalex` would run unconfigured
+rather than failing loudly, so a new entry point must call it.
 
 ## Sample construction
 
