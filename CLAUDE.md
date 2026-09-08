@@ -124,6 +124,27 @@ notebook's own directory first on `sys.path`, which is the whole reason `from he
 import ...` resolves with no path setup in the notebooks. Note this puts `analysis/` on
 the path, not the project root, so `from analysis.helpers import ...` does *not* work.
 
+That is not a style preference, it is the only arrangement that works. `helpers/` imports itself
+absolutely (`from helpers.config import ...`), so `analysis/` has to be on the path; adding the
+project root as well is what the `analysis.`-prefixed form would require, and depending on both
+means the notebooks only run where something injects both. They had drifted to that form and
+failed on the first cell from a plain kernel, in PyCharm as well as headless. Keep every notebook
+import relative to `analysis/`.
+
+To execute notebooks in batch, run this from `analysis/` with the project venv's interpreter
+(spell out the absolute path to it; `analysis/` sits at a different depth in a worktree than in
+the main checkout, so a relative path is not portable between them):
+
+```bash
+python -m nbconvert --to notebook --execute --inplace --ExecutePreprocessor.timeout=900 02_feature_descriptives.ipynb
+```
+
+Order does not matter, since each notebook runs standalone from a cold kernel. Two caveats.
+Notebooks 05, 06 and 07 call `fig.show()` with the renderer set to `"browser"`, which opens a tab
+per figure; for an unattended run, put a `sitecustomize.py` that no-ops `webbrowser.open` on
+`PYTHONPATH` rather than editing the notebooks. And `01_dataset_construction` cannot run without
+credentials (see below).
+
 Figure exports are individually gated behind `if False:` blocks calling `save_figure()`; flip the one figure you want to re-export.
 
 **`data_store/Godwin_2025_metadata.csv` is a frozen OpenAlex snapshot and is gitignored.** Every
@@ -135,6 +156,14 @@ so a wholesale `data_store/` delete would take the backup with it.)
 
 Analysis code does not need API credentials: `helpers.dataset` imports the acquisition layer
 lazily, so a warm cache runs with no `_api_secrets.py` present at all.
+
+**Notebook 01 is the exception, and currently cannot run without credentials.** It calls
+`duplicate_records_diagnostic.find_duplicate_doi_records()`, which reaches
+`prepare_data.load_godwin2025()`. That import is lazy, but `prepare_data` itself imports
+`fetch_metadata` at module level and `fetch_metadata` imports `_api_secrets` at module level, so
+the whole chain is pulled in just to read the source spreadsheet. `tests/test_corpus.py` cannot be
+collected for the same reason. Making `prepare_data`'s import of `fetch_metadata` lazy would fix
+both and restore the invariant above for the whole repo.
 
 ## Sample construction
 
