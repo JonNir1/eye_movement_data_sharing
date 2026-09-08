@@ -11,9 +11,10 @@ from tqdm import tqdm
 from _api_secrets import *
 
 
+from doi import DOI_PATTERN
+
 pyalex.config.email = EMAIL
 pyalex.config.api_key = OPENALEX_API_KEY
-DOI_PATTERN = r'(10\.\d{4,9}/[-._;()/:a-zA-Z0-9]+)'
 
 
 def fetch_all_metadata(

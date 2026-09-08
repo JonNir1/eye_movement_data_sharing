@@ -4,7 +4,7 @@ from typing import Optional
 import re
 import pandas as pd
 
-from fetch_metadata import fetch_all_metadata, DOI_PATTERN
+from doi import DOI_PATTERN
 
 _SHARING_CORRECTIONS = {
     # articles with duplicate records in the original Godwin dataset are re-classified manually
@@ -71,6 +71,11 @@ def _load_or_fetch_metadata(path: str, godwin_dataset: pd.DataFrame) -> pd.DataF
         metadata = pd.read_csv(os.path.join(path), index_col=0)
         print("Loaded OpenAlex metadata from CSV.")
     except FileNotFoundError:
+        # Imported here rather than at module scope: `fetch_metadata` reads API credentials from
+        # `_api_secrets` when it loads, and this is the only path that actually needs the network.
+        # Keeping it lazy lets the analysis layer import `prepare_data` with no credentials present.
+        from fetch_metadata import fetch_all_metadata
+
         print("Fetching metadata from OpenAlex. This may take a few minutes...")
         metadata = fetch_all_metadata(godwin_dataset, sleep_period=0.01, verbose=True)
         metadata.to_csv(path, index=True)
