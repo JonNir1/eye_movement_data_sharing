@@ -139,11 +139,10 @@ the main checkout, so a relative path is not portable between them):
 python -m nbconvert --to notebook --execute --inplace --ExecutePreprocessor.timeout=900 02_feature_descriptives.ipynb
 ```
 
-Order does not matter, since each notebook runs standalone from a cold kernel. Two caveats.
-Notebooks 05, 06 and 07 call `fig.show()` with the renderer set to `"browser"`, which opens a tab
-per figure; for an unattended run, put a `sitecustomize.py` that no-ops `webbrowser.open` on
-`PYTHONPATH` rather than editing the notebooks. And `01_dataset_construction` cannot run without
-credentials (see below).
+Order does not matter, since each notebook runs standalone from a cold kernel. One caveat:
+notebooks 05, 06 and 07 call `fig.show()` with the renderer set to `"browser"`, which opens a tab
+per figure. For an unattended run, put a `sitecustomize.py` that no-ops `webbrowser.open` on
+`PYTHONPATH` rather than editing the notebooks.
 
 Figure exports are individually gated behind `if False:` blocks calling `save_figure()`; flip the one figure you want to re-export.
 
@@ -157,13 +156,16 @@ so a wholesale `data_store/` delete would take the backup with it.)
 Analysis code does not need API credentials: `helpers.dataset` imports the acquisition layer
 lazily, so a warm cache runs with no `_api_secrets.py` present at all.
 
-**Notebook 01 is the exception, and currently cannot run without credentials.** It calls
-`duplicate_records_diagnostic.find_duplicate_doi_records()`, which reaches
-`prepare_data.load_godwin2025()`. That import is lazy, but `prepare_data` itself imports
-`fetch_metadata` at module level and `fetch_metadata` imports `_api_secrets` at module level, so
-the whole chain is pulled in just to read the source spreadsheet. `tests/test_corpus.py` cannot be
-collected for the same reason. Making `prepare_data`'s import of `fetch_metadata` lazy would fix
-both and restore the invariant above for the whole repo.
+That invariant holds for the whole repo, including notebook 01 and `tests/test_corpus.py`, both of
+which reach `prepare_data`. Two things keep it true, and both are load-bearing:
+
+- `prepare_data` imports `fetch_metadata` **inside** `_load_or_fetch_metadata()`, not at module
+  scope, so only the code path that actually queries OpenAlex pulls in credentials.
+- `DOI_PATTERN` lives in `data/doi.py` rather than in `fetch_metadata`, so DOI parsing does not
+  drag the acquisition layer in behind it. That is the only reason `data/doi.py` exists.
+
+Move either one back and notebook 01 stops running without an `_api_secrets.py`, which is how it
+was until this was fixed.
 
 ## Sample construction
 
