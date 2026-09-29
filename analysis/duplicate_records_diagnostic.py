@@ -24,19 +24,6 @@ from typing import Optional
 import pandas as pd
 
 
-def _load_godwin2025():
-    """Import lazily: `prepare_data` pulls in `fetch_metadata`, which reads API credentials from
-    `_api_secrets` at *import* time even though no API call is made here. Deferred to call time,
-    same as `helpers.dataset._prepare_analytical_dataset()`, so merely importing this module
-    doesn't require credentials - calling `find_duplicate_doi_records()` still does, cache or
-    not, since it always re-reads the source Excel file rather than a cached frame."""
-    data_dir = Path(__file__).resolve().parents[1] / "data"
-    if str(data_dir) not in sys.path:
-        sys.path.insert(0, str(data_dir))
-    from prepare_data import load_godwin2025
-    return load_godwin2025
-
-
 def find_duplicate_doi_records(
         dataset_path: Optional[str] = None,
         metadata_path: Optional[str] = None,
@@ -74,6 +61,19 @@ def find_duplicate_doi_records(
           "data_sharing_class", "link_is_bare_doi", "title_missing"]]
     )
     return report
+
+
+def _load_godwin2025():
+    """Import lazily: `prepare_data` pulls in `fetch_metadata`, which reads API credentials from
+    `_api_secrets` at *import* time even though no API call is made here. Deferred to call time,
+    same as `helpers.dataset._prepare_analytical_dataset()`, so merely importing this module
+    doesn't require credentials - calling `find_duplicate_doi_records()` still does, cache or
+    not, since it always re-reads the source Excel file rather than a cached frame."""
+    data_dir = Path(__file__).resolve().parents[1] / "data"
+    if str(data_dir) not in sys.path:
+        sys.path.insert(0, str(data_dir))
+    from data.prepare_data import load_godwin2025
+    return load_godwin2025
 
 
 def _print_summary(report: pd.DataFrame) -> None:
