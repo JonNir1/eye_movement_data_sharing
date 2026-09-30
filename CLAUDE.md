@@ -179,6 +179,17 @@ Check any pipeline change against these counts:
 Articles that shared at more than one level are classified at the **finest** granularity
 available (fixation > trial > participant), so the groups never double-count.
 
+**The "6" above is not the full duplicate-DOI count - do not read it as "6 of 8 duplicates make
+the sample."** `duplicate_records_diagnostic.find_duplicate_doi_records()` finds 8 duplicate-DOI
+pairs across the full 525-record corpus (matching `prepare_data._SHARING_CORRECTIONS`'s 8 keys
+exactly), and **all 8** have their surviving copy in the N=234 sample, confirmed for both the
+June 30 and the current snapshot. The exclusion cascade's own dedup step only catches 6 of them,
+because it runs *after* the topic/year/retraction filters: for 6 pairs both copies pass those
+filters and reach the dedup step, which drops one; for the other 2 pairs
+(`10.1177/1747021820919351`, `10.3758/s13423-021-01920-1`) only one copy ever reaches that step,
+its sibling having already failed topic/year/retraction for unrelated reasons - so the cascade
+never "sees" a duplicate there, even though the wider diagnostic correctly does.
+
 ## Conventions that should not change silently
 
 Each of these is a deliberate choice defended in the manuscript. Changing one means
