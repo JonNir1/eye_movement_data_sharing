@@ -147,7 +147,9 @@ per figure. For an unattended run, put a `sitecustomize.py` that no-ops `webbrow
 Figure exports are individually gated behind `if False:` blocks calling `save_figure()`; flip the one figure you want to re-export.
 
 **`data_store/Godwin_2025_metadata.csv` is a frozen OpenAlex snapshot and is gitignored.** Every
-reported number depends on it. `prepare_data._load_or_fetch_metadata()` will silently re-query
+reported number depends on it. The current snapshot was queried on **2026-09-02** (the manuscript
+should state this date, since a later query can return different counts).
+`prepare_data._load_or_fetch_metadata()` will silently re-query
 OpenAlex and write a *new* snapshot if the file is missing, so `helpers.dataset` refuses to run
 without it rather than regenerating it. If it is ever lost, restore it from a backup or another
 checkout — do not let it rebuild. (`Godwin_2025_metadata.backup.csv` sits in the same directory,
