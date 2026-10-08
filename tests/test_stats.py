@@ -29,7 +29,7 @@ def make_sharing_class_pair(
         earlier_vals: list, later_vals: list, labels: tuple[str, str], feature: str = "score"
 ) -> pd.DataFrame:
     """Two-level `Sharing Class` subset, ordered per `SHARING_CLASS_ORDER`, the shape a
-    notebook-04 post-hoc contrast passes (`labels` must appear in that order, earlier first)."""
+    notebook-05 post-hoc contrast passes (`labels` must appear in that order, earlier first)."""
     cats = pd.CategoricalDtype(categories=SHARING_CLASS_ORDER, ordered=True)
     return pd.DataFrame({
         "Sharing Class": pd.Series(
@@ -224,7 +224,7 @@ class TestSMD:
 class TestGroupCountDispatch:
     """Regression for the latent dispatch bug: branch selection must key on how many groups are
     actually present in the data, not on whether `share_feature` looks like "Is Sharing Data".
-    Notebook 04's post-hoc loop calls `compare_continuous` with `share_feature="Sharing Class"`
+    Notebook 05's post-hoc loop calls `compare_continuous` with `share_feature="Sharing Class"`
     on a subset already narrowed to two levels; that used to fall into the omnibus branch and
     fail its `len(test_groups) > 2` assertion whenever the post-hoc feature was continuous.
     """
