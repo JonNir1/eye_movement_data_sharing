@@ -173,7 +173,7 @@ class TestToSmfColumns:
 
 class TestCitationsFrame:
     """`build_citations_frame` - the shared-year citation DV, renamed for `smf.ols` via
-    `to_smf_columns`. Notebook 04's regression is reported in the manuscript, so this frame's
+    `to_smf_columns`. Notebook 06's regression is reported in the manuscript, so this frame's
     shape, columns, and values must not drift silently."""
 
     def _make_combined(self, total_citations):
@@ -186,7 +186,7 @@ class TestCitationsFrame:
         )
 
     def test_column_names_match_the_regression_formulas(self):
-        # notebook 04 fits `log_citations ~ C(sharing_class) + is_open_access + has_preprint +
+        # notebook 06 fits `log_citations ~ C(sharing_class) + is_open_access + has_preprint +
         # has_us_author + venue_impact + log_weeks_since_pub + log_number_of_authors`; if the
         # rename chain drifts, the formula fails deep inside statsmodels instead of here
         combined = self._make_combined({"a": 10, "b": 20})
