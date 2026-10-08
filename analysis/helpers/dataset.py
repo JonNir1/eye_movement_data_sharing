@@ -275,6 +275,8 @@ def citations_since_publication(articles: pd.DataFrame) -> pd.DataFrame:
 def _shared_complete_year(articles: pd.DataFrame) -> int:
     """The latest calendar year every article in the frame is guaranteed to have complete data
     for: the year before the *earliest* `LastUpdate` (OpenAlex census) timestamp in the frame.
+    The rule is strict: a census at any moment of year N, even Dec 31, only covers years through
+    N-1, because the rest of year N has not been seen yet. The year is read in UTC.
 
     Shared across every DV that needs to time-lock articles to a common cutoff instead of each
     article's own (differently timed) census - see `citations_through_shared_year` and
