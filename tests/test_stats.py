@@ -12,7 +12,7 @@ import pandas as pd
 import pytest
 
 from helpers.config import SHARING_CLASS_ORDER
-from helpers.stats import _calculate_group_stats, compare_binary, compare_continuous
+from helpers.stats import _calculate_group_stats, compare_binary, compare_continuous, significance_class
 
 SHARE_COL = "Is Sharing Data"
 
@@ -29,7 +29,7 @@ def make_sharing_class_pair(
         earlier_vals: list, later_vals: list, labels: tuple[str, str], feature: str = "score"
 ) -> pd.DataFrame:
     """Two-level `Sharing Class` subset, ordered per `SHARING_CLASS_ORDER`, the shape a
-    notebook-04 post-hoc contrast passes (`labels` must appear in that order, earlier first)."""
+    notebook-05 post-hoc contrast passes (`labels` must appear in that order, earlier first)."""
     cats = pd.CategoricalDtype(categories=SHARING_CLASS_ORDER, ordered=True)
     return pd.DataFrame({
         "Sharing Class": pd.Series(
@@ -224,7 +224,7 @@ class TestSMD:
 class TestGroupCountDispatch:
     """Regression for the latent dispatch bug: branch selection must key on how many groups are
     actually present in the data, not on whether `share_feature` looks like "Is Sharing Data".
-    Notebook 04's post-hoc loop calls `compare_continuous` with `share_feature="Sharing Class"`
+    Notebook 05's post-hoc loop calls `compare_continuous` with `share_feature="Sharing Class"`
     on a subset already narrowed to two levels; that used to fall into the omnibus branch and
     fail its `len(test_groups) > 2` assertion whenever the post-hoc feature was continuous.
     """
@@ -286,3 +286,19 @@ class TestGroupCountDispatch:
         assert fixation_higher["effect_sizes"]["CLES"] > 0.5
         assert fixation_lower["effect_sizes"]["CLES"] < 0.5
         assert fixation_higher["statistic"] > 0 > fixation_lower["statistic"]
+
+
+class TestSignificanceClass:
+    @pytest.mark.parametrize("q, label", [
+        (0.0005, "***"), (0.005, "**"), (0.03, "*"), (0.05, "n.s."), (0.8, "n.s."),
+    ])
+    def test_labels(self, q, label):
+        assert significance_class(q) == label
+
+    def test_boundaries_belong_to_the_looser_label(self):
+        assert significance_class(0.001) == "**"
+        assert significance_class(0.01) == "*"
+
+    @pytest.mark.parametrize("q", [np.nan, None, -0.1])
+    def test_missing_or_negative_is_nan(self, q):
+        assert np.isnan(significance_class(q))
