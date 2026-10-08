@@ -52,11 +52,12 @@ between notebooks.
 | `01_dataset_construction` | What is the corpus, how was it built, and does it match Godwin et al.? |
 | `02_feature_descriptives` | What do the article and impact features look like, overall and by sharing status? |
 | `03_feature_preprocessing` | How are the continuous features transformed, and does the transformation fix their normality and skewness? |
-| `04_sharing_and_article_features` | Is sharing associated with other article characteristics? |
-| `05_citation_descriptives` | What do the citation and impact outcomes look like, overall and by sharing status, before any modelling? |
-| `06_citation_counts` | Do sharing articles accrue more raw citations? |
-| `07_citation_dynamics` | When does the advantage appear, and does it persist? |
-| `08_fwci` | Do sharing articles score higher on field-weighted impact? |
+| `04_feature_correlations` | How do the article features correlate with each other, and is there collinearity among the regression predictors? |
+| `05_sharing_and_article_features` | Is sharing associated with other article characteristics? |
+| `06_citation_descriptives` | What do the citation and impact outcomes look like, overall and by sharing status, before any modelling? |
+| `07_citation_counts` | Do sharing articles accrue more raw citations? |
+| `08_citation_dynamics` | When does the advantage appear, and does it persist? |
+| `09_fwci` | Do sharing articles score higher on field-weighted impact? |
 
 `analysis/helpers/` holds only code that two or more notebooks import (`config`, `dataset`,
 `stats`, `plotting`). Single-notebook helpers stay inline on purpose. There is no
@@ -73,11 +74,11 @@ analyses. The notebooks are the work-in-progress answer to that.
 Results order in the revised manuscript:
 
 1. feature descriptives and appendix figures (nb 02, with the transformation checks in nb 03)
-2. sharing status against the other article features (nb 04)
-3. multivariable regression on total citations: age and venue dominate, sharing is null (nb 06)
-4. 3-year cumulative citations on the same covariates, normalizing for age (nb 06/07)
-5. citation dynamics (nb 07)
-6. FWCI (nb 08)
+2. sharing status against the other article features (nb 05)
+3. multivariable regression on total citations: age and venue dominate, sharing is null (nb 07)
+4. 3-year cumulative citations on the same covariates, normalizing for age (nb 07/08)
+5. citation dynamics (nb 08)
+6. FWCI (nb 09)
 
 Decisions already taken, each of which needs re-arguing before it is changed:
 
@@ -92,7 +93,7 @@ Decisions already taken, each of which needs re-arguing before it is changed:
 - **FWCI is the declared primary endpoint**, as it was in v1. The other two citation DVs are
   secondary operationalizations. No multiplicity correction across the three: they are near
   functions of the same counts, so the effective number of tests is close to one. BH still
-  applies within the nb 04 covariate table, where the tests really are distinct.
+  applies within the nb 05 covariate table, where the tests really are distinct.
 - **FWCI excludes age from its model**, since OpenAlex normalizes it by field, year, and
   document type. Venue is *not* baked in, and is a plausible mediator rather than a confounder
   (sharers publish in higher-impact venues), so report both the unadjusted and the
@@ -108,7 +109,7 @@ Still open:
 - **Whether citation dynamics survives as inference.** Year-by-year tests with N falling from
   232 to 83 are the pattern the reviewer objected to. The intended replacement is a single
   longitudinal model (sharing x year interaction, random intercept per article), with the
-  year-by-year plot kept as description. See the TODO at the bottom of nb 07.
+  year-by-year plot kept as description. See the TODO at the bottom of nb 08.
 
 ## Environment
 
@@ -141,7 +142,7 @@ python -m nbconvert --to notebook --execute --inplace --ExecutePreprocessor.time
 ```
 
 Order does not matter, since each notebook runs standalone from a cold kernel. One caveat:
-notebooks 06, 07 and 08 call `fig.show()` with the renderer set to `"browser"`, which opens a tab
+notebooks 07, 08 and 09 call `fig.show()` with the renderer set to `"browser"`, which opens a tab
 per figure. For an unattended run, put a `sitecustomize.py` that no-ops `webbrowser.open` on
 `PYTHONPATH` rather than editing the notebooks.
 

@@ -1,11 +1,12 @@
-"""Group-comparison tests shared by the sharing-vs-features and citation-count notebooks.
+"""Group-comparison tests and significance labels shared by the correlation, sharing-vs-features
+and citation-count notebooks.
 
 Moved verbatim from the original `citations_for_data_sharing.ipynb` (cell 51). The only change
 is that `BINARY_FEATURES` is imported from `helpers.config` rather than read off the notebook
 globals.
 """
 
-from typing import Dict, Literal
+from typing import Dict, Literal, Union
 
 import numpy as np
 import pandas as pd
@@ -13,6 +14,20 @@ import pingouin as pg
 from scipy import stats
 
 from helpers.config import BINARY_FEATURES
+
+
+def significance_class(q: float) -> Union[str, float]:
+    """Star label for a (corrected) p-value: `***` < .001, `**` < .01, `*` < .05, else `n.s.`.
+    NaN for a missing or negative value."""
+    if pd.isnull(q) or q < 0:
+        return np.nan
+    if q < 0.001:
+        return "***"
+    if q < 0.01:
+        return "**"
+    if q < 0.05:
+        return "*"
+    return "n.s."
 
 
 def compare_binary(
