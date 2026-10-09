@@ -93,8 +93,8 @@ Decisions already taken, each of which needs re-arguing before it is changed:
 - **Venue is modelled three ways in nb 07**, all on `log(1 + citations through the shared year)`:
   OLS with venue impact as a covariate (Model 1), a mixed-effects model with venue as a random
   intercept (Model 2), and a mixed-effects model with both (Model 3). Model 3 is the most
-  conservative and is the one reported in the manuscript. The model comparison cell in nb 07 is
-  still a TODO.
+  conservative and is the one reported in the manuscript. Convergence, R^2 and venue ICC are shown for
+  each, and the sharing effect is compared across all three (AIC/BIC are deliberately not used).
 - **FWCI is the declared primary endpoint**, as it was in v1. The other two citation DVs are
   secondary operationalizations. No multiplicity correction across the three: they are near
   functions of the same counts, so the effective number of tests is close to one. BH still
