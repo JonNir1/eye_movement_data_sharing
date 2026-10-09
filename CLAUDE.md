@@ -95,6 +95,8 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   intercept (Model 2), and a mixed-effects model with both (Model 3). Model 3 is the most
   conservative and is the one reported in the manuscript. Convergence, R^2 and venue ICC are shown for
   each, and the sharing effect is compared across all three (AIC/BIC are deliberately not used).
+  The granularity comparison repeats the three models on the 80 sharers only (baseline PARTICIPANT),
+  with one omnibus Wald test per model.
 - **FWCI is the declared primary endpoint**, as it was in v1. The other two citation DVs are
   secondary operationalizations. No multiplicity correction across the three: they are near
   functions of the same counts, so the effective number of tests is close to one. BH still
@@ -250,7 +252,8 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   rather than a sustained rate difference. Attrition caveat: N = 234 at Year 1 falls to
   84 by Year 7, with only 19 sharers left.
 - **Granularity never matters**: null for FWCI (H = 3.08, p = 0.21), for residuals
-  (H = 2.00, p = 0.37), and in every post-publication year.
+  (H = 2.00, p = 0.37), in every post-publication year, and in the nb 07 multivariable models
+  (omnibus Wald p = 0.41, 0.52, 0.37 for Models 1-3).
 - **Covariate comparison**: sharers publish in higher-impact venues, are 4.30x more likely
   to have a preprint, and are more recent. No difference in author count, U.S. authorship,
   or open-access status.
