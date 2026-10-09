@@ -136,6 +136,7 @@ class TestFeatureMatrix:
         combined["IsOpenAccess"] = [1, 1]
         combined["HasPreprint"] = [0, 1]
         combined[VENUE_IMPACT_METRIC] = [1.5, 2.5]
+        combined["VenueName"] = ["Journal A", "Journal B"]
         combined["NumAuthors"] = [2, 3]
         return combined
 
