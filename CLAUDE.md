@@ -17,7 +17,7 @@ current in-progress revision; `brief report.pdf` is the version that was submitt
 
 ```
 data/       acquisition only - OpenAlex/CrossRef fetching, and _api_secrets.py
-analysis/   eight notebooks, one per research question, plus helpers/
+analysis/   nine notebooks, one per research question, plus helpers/
 output/     exported figures
 data_store/ source data AND the derived parquet frames (gitignored)
 ```
@@ -35,7 +35,7 @@ cache that CSV would have produced.
 
 **Re-fetching the metadata CSV is a deliberate, rare, and consequential action** - it moves the
 one thing in this repo that genuinely cannot be reconstructed, and changes every citation-based
-number the manuscript reports (N=232, all citation counts, FWCI, ...). Before overwriting the
+number the manuscript reports (N=234, all citation counts, FWCI, ...). Before overwriting the
 live `Godwin_2025_metadata.csv`, copy the outgoing file to `Godwin_2025_metadata.backup.csv`
 (overwriting *that* is fine - it only ever needs to hold the immediately-prior snapshot, not a
 history). After the CSV is replaced, rebuild the parquet cache with `load_or_build(rebuild=True)`
@@ -55,7 +55,7 @@ between notebooks.
 | `04_feature_correlations` | How do the article features correlate with each other, and is there collinearity among the regression predictors? |
 | `05_sharing_and_article_features` | Is sharing associated with other article characteristics? |
 | `06_citation_descriptives` | What do the citation and impact outcomes look like, overall and by sharing status, before any modelling? |
-| `07_citation_counts` | Do sharing articles accrue more raw citations? |
+| `07_citation_counts` | Do sharing articles accrue more citations, univariately and after adjusting for the other predictors (OLS and mixed-effects models)? |
 | `08_citation_dynamics` | When does the advantage appear, and does it persist? |
 | `09_fwci` | Do sharing articles score higher on field-weighted impact? |
 
@@ -75,8 +75,8 @@ Results order in the revised manuscript:
 
 1. feature descriptives and appendix figures (nb 02, with the transformation checks in nb 03)
 2. sharing status against the other article features (nb 05)
-3. multivariable regression on total citations: age and venue dominate, sharing is null (nb 07)
-4. 3-year cumulative citations on the same covariates, normalizing for age (nb 07/08)
+3. multivariable regression on total citations: age and venue dominate, sharing is null (nb 07; three models, see below)
+4. 3-year cumulative citations on the same covariates, normalizing for age (planned, not yet in any notebook)
 5. citation dynamics (nb 08)
 6. FWCI (nb 09)
 
@@ -84,12 +84,17 @@ Decisions already taken, each of which needs re-arguing before it is changed:
 
 - **The 3-year window is determined, not chosen.** It is the largest k for which every article
   has k complete post-publication calendar years (latest publication 2022, and 2025 is closed).
-  It is therefore not a sample restriction: all 232 articles are retained, which also respects
+  It is therefore not a sample restriction: all 234 articles are retained, which also respects
   the reviewer's two separate requests not to shrink the sample. Sensitivity analyses run
   downward (1, 2 years); 5 years would drop articles.
-- **No two-stage residualization.** Fit one multivariable model with the windowed count as the
-  DV. Regressing on venue and then t-testing the residuals gives the right point estimate and
+- **No two-stage residualization.** Fit one multivariable model with the citation count as the
+  DV (the windowed count for the planned 3-year analysis). Regressing on venue and then t-testing the residuals gives the right point estimate and
   the wrong standard errors.
+- **Venue is modelled three ways in nb 07**, all on `log(1 + citations through the shared year)`:
+  OLS with venue impact as a covariate (Model 1), a mixed-effects model with venue as a random
+  intercept (Model 2), and a mixed-effects model with both (Model 3). Model 3 is the most
+  conservative and is the one reported in the manuscript. The model comparison cell in nb 07 is
+  still a TODO.
 - **FWCI is the declared primary endpoint**, as it was in v1. The other two citation DVs are
   secondary operationalizations. No multiplicity correction across the three: they are near
   functions of the same counts, so the effective number of tests is close to one. BH still
@@ -107,9 +112,10 @@ Still open:
   plan does not touch, and it is what would let the null sharing effect be reported as evidence
   for the null rather than hedged.
 - **Whether citation dynamics survives as inference.** Year-by-year tests with N falling from
-  232 to 83 are the pattern the reviewer objected to. The intended replacement is a single
-  longitudinal model (sharing x year interaction, random intercept per article), with the
-  year-by-year plot kept as description. See the TODO at the bottom of nb 08.
+  234 to 84 are the pattern the reviewer objected to. The intended replacement is a single
+  mixed-effects model of cumulative citations k years after publication on all covariates (journal
+  as a categorical or random effect, publication year as a categorical or random effect, still to
+  be decided), with the year-by-year plot kept as description. See the TODO at the bottom of nb 08.
 
 ## Environment
 
@@ -219,8 +225,11 @@ changing the text too.
   (+11 not already found) → repository search (+8) = 47 total (20.1%). A candidate is
   accepted only when title similarity is high, first *and* last author match exactly, and
   the preprint year is at or before the publication year.
-- **Statistics**: alpha = 0.05. Tests of the sharing hypothesis are **one-sided**;
-  multiplicity is handled with Benjamini-Hochberg FDR.
+- **Statistics**: alpha = 0.05. Tests of the sharing hypothesis are **one-sided**; the covariate
+  comparisons in nb 05 are two-sided. Multiplicity is handled with Benjamini-Hochberg FDR.
+- **Feature matrix**: `build_feature_matrix()` also carries `Venue Name` (a string), the grouping
+  factor for the mixed-effects models in nb 07. It is not a predictor, so any loop or correlation over
+  the matrix's columns must exclude it, along with `Sharing Class` where relevant.
 - **Collinearity** is currently clean and should stay so: max pairwise r = 0.29,
   max VIF = 1.2 across the seven predictors.
 
@@ -230,7 +239,11 @@ If a refactor moves any of these, it is a regression until proven otherwise.
 
 - **FWCI**: sharing > non-sharing, one-sided Mann-Whitney p = 0.04, medians 1.20 vs 0.92.
   Effect is small (r_rb = 0.14, CLES = 0.57).
-- **Age-adjusted residuals**: sharers accrue ~17.8% more citations, but only marginally
+- **Multivariable citation models (nb 07)**: the sharing coefficient is null in all three: b = 0.075
+  (p = 0.56), 0.092 (p = 0.48), 0.044 (p = 0.73) for Models 1-3. In Model 3, venue impact is
+  significant (b = 0.170, p = 0.012) and log age dominates (b = 1.12, p < 0.001). The univariate
+  one-sided t-test on `log(1 + citations)` is also null (t = 0.40, p = 0.35, d = 0.06).
+- **Age-adjusted residuals** (v1, superseded, nb 07): sharers accrue ~17.8% more citations, but only marginally
   (t(232) = 1.38, p = 0.085, d = 0.19).
 - **Citation dynamics**: significant cumulative advantage in Years 1-4, marginal in 5-7,
   null by Year 8. Citation *velocity* differs only in Year 1 — read as early visibility
