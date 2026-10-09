@@ -130,9 +130,10 @@ def build_feature_matrix(combined: pd.DataFrame) -> pd.DataFrame:
         "Has US Author": combined["HasUSAuthor"].astype(int),
         "Is Open Access": combined["IsOpenAccess"].astype(int),
         "Has Preprint": combined["HasPreprint"].astype(int),
-        "Venue Impact": combined[VENUE_IMPACT_METRIC],
         "log(Weeks Since Pub.)": np.log(weeks),
         "log(Number of Authors)": np.log(combined["NumAuthors"]),
+        "Venue Impact": combined[VENUE_IMPACT_METRIC],
+        "Venue Name": combined["VenueName"],
     })
 
 
