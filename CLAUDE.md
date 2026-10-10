@@ -85,8 +85,12 @@ Decisions already taken, each of which needs re-arguing before it is changed:
 - **The 3-year window is determined, not chosen.** It is the largest k for which every article
   has k complete post-publication calendar years (latest publication 2022, and 2025 is closed).
   It is therefore not a sample restriction: all 234 articles are retained, which also respects
-  the reviewer's two separate requests not to shrink the sample. Sensitivity analyses run
-  downward (1, 2 years); 5 years would drop articles.
+  the reviewer's two separate requests not to shrink the sample.
+
+  **No varying-k or cutoff-sensitivity robustness analyses**, for either citation DV. Sweeping k
+  downward (1, 2 years), or re-running the shared-year count at an earlier cutoff, only discards
+  citations, and the temporal question either would gesture at is answered directly and better by
+  the citation-dynamics model in nb 08. Report the one determined window; do not sweep it.
 - **No two-stage residualization.** Fit one multivariable model with the citation count as the
   DV (the windowed count for the planned 3-year analysis). Regressing on venue and then t-testing the residuals gives the right point estimate and
   the wrong standard errors.
