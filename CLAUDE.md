@@ -75,7 +75,7 @@ Results order in the revised manuscript:
 
 1. feature descriptives and appendix figures (nb 02, with the transformation checks in nb 03)
 2. sharing status against the other article features (nb 05)
-3. multivariable regression on total citations: age and venue dominate, sharing is null (nb 07; three models, see below)
+3. multivariable regression on the shared-year citation count: age and venue dominate, sharing is null (nb 07; three models, see below)
 4. 3-year cumulative citations on the same covariates, normalizing for age (planned, not yet in any notebook)
 5. citation dynamics (nb 08)
 6. FWCI (nb 09)
