@@ -76,23 +76,29 @@ Results order in the revised manuscript:
 1. feature descriptives and appendix figures (nb 02, with the transformation checks in nb 03)
 2. sharing status against the other article features (nb 05)
 3. multivariable regression on the shared-year citation count: age and venue dominate, sharing is null (nb 07; three models, see below)
-4. 3-year cumulative citations on the same covariates, normalizing for age (planned, not yet in any notebook)
-5. citation dynamics (nb 08)
-6. FWCI (nb 09)
+4. citation dynamics, year by year post-publication (nb 08)
+5. FWCI (nb 09)
 
 Decisions already taken, each of which needs re-arguing before it is changed:
 
-- **The 3-year window is determined, not chosen.** It is the largest k for which every article
-  has k complete post-publication calendar years (latest publication 2022, and 2025 is closed).
-  It is therefore not a sample restriction: all 234 articles are retained, which also respects
-  the reviewer's two separate requests not to shrink the sample.
+- **No fixed k-year window, and no cutoff sensitivity analyses.** An earlier plan added a second
+  citation DV: cumulative citations over the first k = 3 post-publication years, k being the
+  largest value for which every article has k complete calendar years, with robustness checks
+  sweeping k down to 1 and 2. That DV is dropped, and so are the sweeps.
 
-  **No varying-k or cutoff-sensitivity robustness analyses**, for either citation DV. Sweeping k
-  downward (1, 2 years), or re-running the shared-year count at an earlier cutoff, only discards
-  citations, and the temporal question either would gesture at is answered directly and better by
-  the citation-dynamics model in nb 08. Report the one determined window; do not sweep it.
+  It answered the same question as nb 07, which already adjusts for exposure with
+  `log_weeks_since_pub` rather than equalizing it by construction, so the two were near functions
+  of the same counts. Sweeping k, or re-running the shared-year count at an earlier cutoff, only
+  discards citations; the temporal question either would gesture at is answered directly by the
+  year-by-year model in nb 08. Report the one determined cutoff; do not sweep it.
+- **Citation dynamics stays, as a multivariable model.** The reviewer never asked for the
+  year-by-year analysis to go, and it is the only thing in the paper that answers *when* an
+  advantage appears, which the aggregate DVs cannot. What has to change is how it is fitted: his
+  two substantive results-section comments both land on it (include other citation predictors, and
+  stop presenting near-significant effects as noteworthy), and the Years 5-7 "marginal" result is
+  the clearest instance of what he objected to.
 - **No two-stage residualization.** Fit one multivariable model with the citation count as the
-  DV (the windowed count for the planned 3-year analysis). Regressing on venue and then t-testing the residuals gives the right point estimate and
+  DV. Regressing on venue and then t-testing the residuals gives the right point estimate and
   the wrong standard errors.
 - **Venue is modelled three ways in nb 07**, all on `log(1 + citations through the shared year)`:
   OLS with venue impact as a covariate (Model 1), a mixed-effects model with venue as a random
@@ -117,11 +123,19 @@ Still open:
 - **Bayes factors are not implemented anywhere.** This is the one reviewer request the current
   plan does not touch, and it is what would let the null sharing effect be reported as evidence
   for the null rather than hedged.
-- **Whether citation dynamics survives as inference.** Year-by-year tests with N falling from
-  234 to 84 are the pattern the reviewer objected to. The intended replacement is a single
-  mixed-effects model of cumulative citations k years after publication on all covariates (journal
-  as a categorical or random effect, publication year as a categorical or random effect, still to
-  be decided), with the year-by-year plot kept as description. See the TODO at the bottom of nb 08.
+- **How citation dynamics is fitted.** The analysis stays (see above); the current
+  implementation does not. Year-by-year Mann-Whitney tests with N falling from 234 to 84, FDR
+  correction across years, and a 20-article minimum threshold are all to be replaced by a single
+  model: citations in year *k* regressed on sharing x *k* plus the covariates, with random
+  intercepts per article and per venue. Modelling the annual *increment* rather than the
+  cumulative stock matters, since cumulative counts are autocorrelated by construction (year *k*
+  contains year *k*-1). `dataset.citations_since_publication()` already returns the long frame
+  this needs. The trajectory figure stays as description. See the TODO at the bottom of nb 08.
+
+  Open within this: whether venue and publication year enter as random effects or as categorical
+  fixed effects. Also worth one sentence in the manuscript on why time is binned annually, since
+  the reviewer's page-6 comment suggests expressing things in weeks: OpenAlex serves
+  `counts_by_year`, so annual is the finest resolution the source supports.
 
 ## Environment
 
