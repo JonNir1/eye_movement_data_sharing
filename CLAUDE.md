@@ -114,9 +114,13 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   effect, and `log_weeks_since_pub` is left out because cohort and k already carry age. Gaussian,
   Poisson and negative-binomial fits are compared, on AIC for Poisson vs. NB only (a Gaussian density
   is not comparable to a count pmf). The sharing main effect is the group difference at k = 0, the
-  excluded publication year, so it is not interpreted: the `is_sharing_data:k` interaction is. A
-  linear k is kept unless log(k) lowers the AIC by more than 2. Count fits use the bobyqa optimizer;
-  `glmer.nb` takes about two minutes per fit.
+  excluded publication year, so it is not interpreted: the sharing-by-time interaction is. Time is
+  tried as `k`, `log(k)` and a quadratic `k + k^2`, and the simplest is kept unless another lowers the
+  AIC by more than 2. The quadratic is fitted on standardized k (`k_z + k_z^2`, the same model): raw k
+  and k^2 are nearly collinear and lme4 does not converge on them. Count fits use the bobyqa
+  optimizer. `glmer.nb` estimates theta in an outer loop and takes about two minutes per fit, so the
+  `log(k)` and quadratic refits hold theta at the value estimated for `k` (`fit_glmm(theta=...)`, which
+  reproduces the `glmer.nb` AIC to two decimals); their AICs are therefore conditional on that theta.
 - **FWCI is the declared primary endpoint**, as it was in v1. The other two citation DVs are
   secondary operationalizations. No multiplicity correction across the three: they are near
   functions of the same counts, so the effective number of tests is close to one. BH still
@@ -276,11 +280,14 @@ If a refactor moves any of these, it is a regression until proven otherwise.
 - **Age-adjusted residuals** (v1, superseded, nb 07): sharers accrue ~17.8% more citations, but only marginally
   (t(232) = 1.38, p = 0.085, d = 0.19).
 - **Citation dynamics, model (nb 08)**: negative binomial beats Poisson on AIC (5574.3 vs 5636.7;
-  Poisson overdispersion ratio 1.05, NB theta 11.5), and log(k) does not improve on k (AIC -0.9). The
-  `is_sharing_data:k` rate ratio is 0.939 (95% CI 0.902 to 0.978, p = 0.0025): sharing articles'
-  yearly citations fall about 6% per year relative to non-sharing ones. Poisson gives 0.944
-  (p = 0.0007) and Gaussian b = -0.21 citations/year (p = 0.0056). Predicted citations for a typical
-  article run from 2.6 to 2.1 (sharing) and 2.1 to 2.5 (non-sharing) over k = 1 to 8.
+  Poisson overdispersion ratio 1.05, NB theta 11.5). With linear k, the `is_sharing_data:k` rate ratio
+  is 0.939 (95% CI 0.902 to 0.978, p = 0.0025): sharing articles' yearly citations fall about 6% per
+  year relative to non-sharing ones. Poisson gives 0.944 (p = 0.0007) and Gaussian b = -0.21
+  citations/year (p = 0.0056). Time term: log(k) does not improve on k (AIC -0.9), but the quadratic does
+  (AIC -5.6, so it is the one used). In it the sharing-by-slope term stays significant (b = -0.155 per
+  SD of k, p = 0.0005) while the sharing-by-curvature term is not (p = 0.31): both groups curve alike.
+  Predicted citations for a typical article run 2.6 to 1.7 (sharing) and 2.1 to 2.5 to 2.1
+  (non-sharing, peaking at k = 4 to 5) over k = 1 to 8.
 - **Citation dynamics** (v1, superseded, nb 08): significant cumulative advantage in Years 1-4, marginal in 5-7,
   null by Year 8. Citation *velocity* differs only in Year 1 — read as early visibility
   rather than a sustained rate difference. Attrition caveat: N = 234 at Year 1 falls to
