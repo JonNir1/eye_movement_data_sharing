@@ -75,7 +75,7 @@ Results order in the revised manuscript:
 
 1. feature descriptives and appendix figures (nb 02, with the transformation checks in nb 03)
 2. sharing status against the other article features (nb 05)
-3. multivariable regression on the shared-year citation count: age and venue dominate, sharing is null (nb 07; three models, see below)
+3. multivariable regression on the shared-year citation count: age and venue dominate, sharing is null (nb 07; four models, see below)
 4. citation dynamics, year by year post-publication (nb 08)
 5. FWCI (nb 09)
 
@@ -100,13 +100,17 @@ Decisions already taken, each of which needs re-arguing before it is changed:
 - **No two-stage residualization.** Fit one multivariable model with the citation count as the
   DV. Regressing on venue and then t-testing the residuals gives the right point estimate and
   the wrong standard errors.
-- **Venue is modelled three ways in nb 07**, all on `log(1 + citations through the shared year)`:
+- **Venue is modelled four ways in nb 07**, all on `log(1 + citations through the shared year)`:
+  OLS with no venue term and standard errors clustered by venue (Model 0, the total association),
   OLS with venue impact as a covariate (Model 1), a mixed-effects model with venue as a random
   intercept (Model 2), and a mixed-effects model with both (Model 3). Model 3 is the most
-  conservative and is the one reported in the manuscript. Convergence, R^2 and venue ICC are shown for
-  each, and the sharing effect is compared across all three (AIC/BIC are deliberately not used).
-  The granularity comparison repeats the three models on the 80 sharers only (baseline PARTICIPANT),
-  with one omnibus Wald test per model.
+  conservative; it is reported beside Model 0, and the difference between them is read as mechanism
+  (see the FWCI decision below: venue is a plausible mediator). Model 0 handles the within-venue
+  correlation in the variance (CR1, t on G - 1 df: 22 for the 23 venues, 19 for the sharers-only
+  granularity models), since a random intercept would also condition on venue. Convergence, R^2 and
+  venue ICC are shown for each, and the sharing effect is compared across all four (AIC/BIC are
+  deliberately not used). The granularity comparison repeats the four models on the 80 sharers only
+  (baseline PARTICIPANT), with one omnibus Wald test per model.
 - **Citation dynamics is one mixed-effects model of yearly citation flow (nb 08)**, fitted in R with
   lme4 (`helpers.r_models.fit_glmm`): `citations ~ is_sharing_data * k + has_us_author +
   is_open_access + has_preprint + log_number_of_authors + venue_impact + factor(publication_year) +
@@ -130,7 +134,11 @@ Decisions already taken, each of which needs re-arguing before it is changed:
 - **FWCI excludes age from its model**, since OpenAlex normalizes it by field, year, and
   document type. Venue is *not* baked in, and is a plausible mediator rather than a confounder
   (sharers publish in higher-impact venues), so report both the unadjusted and the
-  venue-adjusted model and read the difference as mechanism, not as nuisance.
+  venue-adjusted model and read the difference as mechanism, not as nuisance. In nb 09 the
+  unadjusted one is Model 0: OLS with no venue term and standard errors clustered by venue (CR1, t on
+  G - 1 = 22 df, since there are only 23 venues). A venue-free model cannot absorb the within-venue
+  correlation (ICC about 0.07, about 10 articles per venue, design effect about 1.6) through a random
+  effect, because a random intercept also conditions on venue and so is not venue-free.
 - **Superseded v1 analyses stay in the notebooks**, clearly marked as superseded, so the
   published results remain reproducible. They do not appear in the revised manuscript.
 
@@ -274,10 +282,16 @@ changing the text too.
 If a refactor moves any of these, it is a regression until proven otherwise.
 
 - **FWCI**: sharing > non-sharing, one-sided Mann-Whitney p = 0.04, medians 1.20 vs 0.92.
-  Effect is small (r_rb = 0.14, CLES = 0.57).
-- **Multivariable citation models (nb 07)**: the sharing coefficient is null in all three: b = 0.075
-  (p = 0.56), 0.092 (p = 0.48), 0.044 (p = 0.73) for Models 1-3. In Model 3, venue impact is
-  significant (b = 0.170, p = 0.012) and log age dominates (b = 1.12, p < 0.001). The univariate
+  Effect is small (r_rb = 0.14, CLES = 0.57). The Mann-Whitney test ignores venue clustering, and the
+  multivariable models on `log(imputed FWCI)` (nb 09) are all null: the sharing coefficient is
+  b = 0.172 (cluster-robust p = 0.19) with no venue term (Model 0), 0.092 (p = 0.54) with venue impact
+  (Model 1), 0.126 (p = 0.41) with a venue random intercept (Model 2), and 0.072 (p = 0.64) with both
+  (Model 3). Adjusting for venue about halves the estimate, in line with venue as a mediator.
+- **Multivariable citation models (nb 07)**: the sharing coefficient is null in all four: b = 0.137
+  (cluster-robust p = 0.16) with no venue term (Model 0), then 0.075 (p = 0.56), 0.092 (p = 0.48) and
+  0.044 (p = 0.73) for Models 1-3, so adjusting for venue cuts the estimate by about two thirds. In
+  Model 3, venue impact is significant (b = 0.170, p = 0.012) and log age dominates (b = 1.12,
+  p < 0.001). The univariate
   one-sided t-test on `log(1 + citations)` is also null (t = 0.40, p = 0.35, d = 0.06).
 - **Age-adjusted residuals** (v1, superseded, nb 07): sharers accrue ~17.8% more citations, but only marginally
   (t(232) = 1.38, p = 0.085, d = 0.19).
@@ -297,7 +311,7 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   84 by Year 7, with only 19 sharers left.
 - **Granularity never matters**: null for FWCI (H = 3.08, p = 0.21), for residuals
   (H = 2.00, p = 0.37), in every post-publication year, and in the nb 07 multivariable models
-  (omnibus Wald p = 0.41, 0.52, 0.37 for Models 1-3).
+  (omnibus Wald p = 0.38, 0.41, 0.52, 0.37 for Models 0-3).
 - **Covariate comparison**: sharers publish in higher-impact venues, are 4.30x more likely
   to have a preprint, and are more recent. No difference in author count, U.S. authorship,
   or open-access status.
