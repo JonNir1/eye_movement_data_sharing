@@ -69,7 +69,10 @@ fit <- withCallingHandlers(
     invokeRestart("muffleWarning")
   }
 )
-messages <- unique(c(messages, unlist(fit@optinfo$conv$lme4$messages)))
+# lme4 records its convergence problems in optinfo; other warnings (glmer.nb emits a harmless
+# recycling warning) are kept in `messages` but do not mean the fit failed
+convergence_problems <- unlist(fit@optinfo$conv$lme4$messages)
+messages <- unique(c(messages, convergence_problems))
 
 is_count <- job$family != "gaussian"
 result <- list(
@@ -79,7 +82,7 @@ result <- list(
     # a Gaussian density and a count pmf are not comparable, so AIC is only reported for count families
     aic = if (is_count) AIC(fit) else NA,
     singular = isSingular(fit),
-    converged = length(messages) == 0,
+    converged = length(convergence_problems) == 0,
     messages = messages,
     overdispersion = if (is_count) sum(residuals(fit, type = "pearson")^2) / df.residual(fit) else NA,
     theta = if (job$family == "nb") getME(fit, "glmer.nb.theta") else NA
