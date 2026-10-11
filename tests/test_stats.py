@@ -14,8 +14,8 @@ import statsmodels.formula.api as smf
 
 from helpers.config import SHARING_CLASS_ORDER
 from helpers.stats import (
-    _calculate_group_stats, compare_binary, compare_continuous, model_diagnostics, percent_difference,
-    sharing_effect, significance_class,
+    _calculate_group_stats, compare_binary, compare_continuous, granularity_wald_test, model_diagnostics,
+    percent_difference, sharing_effect, significance_class,
 )
 
 SHARE_COL = "Is Sharing Data"
@@ -342,3 +342,42 @@ class TestRegressionSummaries:
         assert diagnostics["N"] == len(data)
         assert 0 <= diagnostics["R2 marginal"] <= diagnostics["R2 conditional"] <= 1
         assert 0 <= diagnostics["ICC"] < 1
+
+
+class TestGranularityWaldTest:
+    TERMS = ["C(sharing_class)[T.TRIAL]", "C(sharing_class)[T.FIXATION]"]
+
+    @staticmethod
+    def _make_data(effects: dict, seed: int = 0, per_class: int = 40) -> pd.DataFrame:
+        rng = np.random.default_rng(seed)
+        classes = np.repeat(["PARTICIPANT", "TRIAL", "FIXATION"], per_class)
+        venue_index = rng.integers(0, 6, size=classes.size)
+        venue_effect = rng.normal(scale=0.7, size=6)[venue_index]
+        y = np.array([effects[c] for c in classes]) + venue_effect + rng.normal(size=classes.size)
+        venue = np.array([f"v{i}" for i in venue_index])
+        data = pd.DataFrame({"y": y, "sharing_class": pd.Categorical(
+            classes, categories=["PARTICIPANT", "TRIAL", "FIXATION"], ordered=True), "venue_name": venue})
+        return data
+
+    def test_ols_matches_the_f_test_of_the_same_restriction(self):
+        data = self._make_data({"PARTICIPANT": 0.0, "TRIAL": 0.3, "FIXATION": 0.6})
+        fit = smf.ols("y ~ C(sharing_class)", data).fit()
+        expected = fit.f_test("C(sharing_class)[T.TRIAL] = C(sharing_class)[T.FIXATION] = 0")
+        result = granularity_wald_test(fit, self.TERMS)
+        assert result["statistic"] == pytest.approx(float(expected.fvalue))
+        assert result["p"] == pytest.approx(float(expected.pvalue))
+
+    def test_a_real_difference_is_detected_and_no_difference_is_not(self):
+        different = smf.ols("y ~ C(sharing_class)", self._make_data({"PARTICIPANT": 0.0, "TRIAL": 1.0, "FIXATION": 2.0})).fit()
+        same = smf.ols("y ~ C(sharing_class)", self._make_data({"PARTICIPANT": 0.0, "TRIAL": 0.0, "FIXATION": 0.0})).fit()
+        assert granularity_wald_test(different, self.TERMS)["p"] < 0.001
+        assert granularity_wald_test(same, self.TERMS)["p"] > 0.05
+
+    def test_works_on_cluster_robust_and_mixed_fits(self):
+        data = self._make_data({"PARTICIPANT": 0.0, "TRIAL": 0.5, "FIXATION": 1.0})
+        clustered = smf.ols("y ~ C(sharing_class)", data).fit(
+            cov_type="cluster", cov_kwds={"groups": pd.factorize(data["venue_name"])[0]}, use_t=True)
+        mixed = smf.mixedlm("y ~ C(sharing_class)", data, groups=data["venue_name"]).fit(reml=False)
+        for fit in (clustered, mixed):
+            result = granularity_wald_test(fit, self.TERMS)
+            assert 0 <= result["p"] <= 1 and result["statistic"] > 0

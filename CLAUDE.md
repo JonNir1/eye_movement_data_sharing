@@ -110,7 +110,7 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   granularity models), since a random intercept would also condition on venue. Convergence, R^2 and
   venue ICC are shown for each, and the sharing effect is compared across all four (AIC/BIC are
   deliberately not used); nb 07 and nb 09 share `helpers.stats.model_diagnostics` and `sharing_effect`
-  for this. The granularity comparison repeats the four models on the 80 sharers only
+  for this, and `granularity_wald_test` for the omnibus test. The granularity comparison repeats the four models on the 80 sharers only
   (baseline PARTICIPANT), with one omnibus Wald test per model.
 - **Citation dynamics is one mixed-effects model of yearly citation flow (nb 08)**, fitted in R with
   lme4 (`helpers.r_models.fit_glmm`): `citations ~ is_sharing_data * k + has_us_author +

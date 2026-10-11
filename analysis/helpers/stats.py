@@ -74,6 +74,24 @@ def sharing_effect(result, term: str) -> dict:
     }
 
 
+def granularity_wald_test(result, terms: list[str]) -> dict:
+    """Joint Wald test that all the coefficients named in `terms` are zero, e.g. the sharing-class
+    dummies of a fitted OLS or `MixedLM` model: the omnibus test of "does granularity matter at all".
+
+    Works on any statsmodels result with named parameters, including OLS fitted with cluster-robust
+    standard errors (the test then uses that covariance). It is an F test for OLS and a chi-square
+    test for `MixedLM`.
+
+    :param terms: parameter names, as they appear in `result.params`, e.g. `C(sharing_class)[T.TRIAL]`.
+    :return: `{"statistic": ..., "p": ...}`.
+    """
+    restrictions = np.zeros((len(terms), len(result.params)))
+    for row, term in enumerate(terms):
+        restrictions[row, result.params.index.get_loc(term)] = 1
+    test = result.wald_test(restrictions, scalar=True)
+    return {"statistic": float(test.statistic), "p": float(test.pvalue)}
+
+
 def compare_binary(
         data: pd.DataFrame,
         share_feature: Literal["Is Sharing Data", "Sharing Class"],
