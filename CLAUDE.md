@@ -116,8 +116,10 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   is not comparable to a count pmf). The sharing main effect is the group difference at k = 0, the
   excluded publication year, so it is not interpreted: the sharing-by-time interaction is. Time is
   tried as `k`, `log(k)` and a quadratic `k + k^2`, and the simplest is kept unless another lowers the
-  AIC by more than 2. The quadratic is fitted on standardized k (`k_z + k_z^2`, the same model): raw k
-  and k^2 are nearly collinear and lme4 does not converge on them. Count fits use the bobyqa
+  AIC by more than 2. The quadratic has the same curvature in both groups, i.e. `is_sharing_data * k_z
+  + I(k_z^2)` with no sharing x k^2 interaction (not supported, LRT p = 0.31), so the sharing
+  difference stays linear in time and one coefficient summarizes it. It is fitted on standardized k
+  (`k_z`, the same model): raw k and k^2 are nearly collinear and lme4 does not converge on them. Count fits use the bobyqa
   optimizer. `glmer.nb` estimates theta in an outer loop and takes about two minutes per fit, so the
   `log(k)` and quadratic refits hold theta at the value estimated for `k` (`fit_glmm(theta=...)`, which
   reproduces the `glmer.nb` AIC to two decimals); their AICs are therefore conditional on that theta.
@@ -283,11 +285,12 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   Poisson overdispersion ratio 1.05, NB theta 11.5). With linear k, the `is_sharing_data:k` rate ratio
   is 0.939 (95% CI 0.902 to 0.978, p = 0.0025): sharing articles' yearly citations fall about 6% per
   year relative to non-sharing ones. Poisson gives 0.944 (p = 0.0007) and Gaussian b = -0.21
-  citations/year (p = 0.0056). Time term: log(k) does not improve on k (AIC -0.9), but the quadratic does
-  (AIC -5.6, so it is the one used). In it the sharing-by-slope term stays significant (b = -0.155 per
-  SD of k, p = 0.0005) while the sharing-by-curvature term is not (p = 0.31): both groups curve alike.
-  Predicted citations for a typical article run 2.6 to 1.7 (sharing) and 2.1 to 2.5 to 2.1
-  (non-sharing, peaking at k = 4 to 5) over k = 1 to 8.
+  citations/year (p = 0.0056). Time term: log(k) does not improve on k (AIC -0.9), but the shared
+  quadratic does (AIC -6.5, so it is the one used). In it the sharing-by-time slope is b = -0.142 per SD
+  of k (about 2 years; rate ratio 0.87, p = 0.0009), the common curvature is negative (p = 0.003), and
+  the sharing main effect at the mean k is null (p = 0.97). Predicted citations for a typical article:
+  sharing 2.5, 2.6, 2.5 down to 1.6 and non-sharing 2.1 rising to 2.5 at k = 5 then falling to 2.2,
+  over k = 1 to 8.
 - **Citation dynamics** (v1, superseded, nb 08): significant cumulative advantage in Years 1-4, marginal in 5-7,
   null by Year 8. Citation *velocity* differs only in Year 1 — read as early visibility
   rather than a sustained rate difference. Attrition caveat: N = 234 at Year 1 falls to
