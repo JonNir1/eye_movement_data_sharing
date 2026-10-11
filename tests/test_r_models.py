@@ -48,6 +48,15 @@ class TestFitGlmm:
         assert np.allclose(result.predictions["fit"], expected)
         assert (result.predictions["ci_low"] < result.predictions["fit"]).all()
 
+    def test_negative_binomial_with_a_fixed_theta_reports_that_theta(self):
+        result = fit_glmm(make_poisson_data(), "y ~ x + (1 | g)", "nb", factors=("g",), theta=5.0)
+        assert result.fit["theta"] == 5.0
+        assert result.fixed_effects.loc["x", "estimate"] == pytest.approx(TRUE_SLOPE, abs=0.08)
+
+    def test_theta_is_rejected_for_other_families(self):
+        with pytest.raises(ValueError, match="theta"):
+            fit_glmm(make_poisson_data(), "y ~ x + (1 | g)", "poisson", factors=("g",), theta=5.0)
+
     def test_an_r_error_is_raised_with_rs_message(self):
         with pytest.raises(RuntimeError, match="R failed"):
             fit_glmm(make_poisson_data(), "y ~ not_a_column + (1 | g)", "poisson", factors=("g",))

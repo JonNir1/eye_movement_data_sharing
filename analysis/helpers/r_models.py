@@ -83,6 +83,7 @@ def fit_glmm(
         family: Family,
         factors: tuple[str, ...] = ("venue_name", "article"),
         newdata: Optional[pd.DataFrame] = None,
+        theta: Optional[float] = None,
         timeout: int = 900,
 ) -> GlmmResult:
     """Fit `formula` (lme4 syntax, e.g. `y ~ x + (1 | group/subject)`) to `df` with the given family.
@@ -90,8 +91,14 @@ def fit_glmm(
     :param factors: columns of `df` to treat as factors in R (the grouping variables).
     :param newdata: optional frame to predict on, fixed effects only; it needs every column the fixed
         part of `formula` uses.
+    :param theta: negative-binomial dispersion to hold fixed (family `nb` only). Estimating it with
+        `glmer.nb` takes minutes; a fixed theta, e.g. from an earlier fit, takes seconds and gives the same
+        log-likelihood up to the theta that was fixed, so AICs of models sharing one theta are comparable.
+    :raises ValueError: when `theta` is given for a family other than `nb`.
     :raises RuntimeError: when R fails, with R's stderr in the message.
     """
+    if theta is not None and family != "nb":
+        raise ValueError(f"theta only applies to the negative-binomial family, not {family!r}")
     with tempfile.TemporaryDirectory() as workdir:
         work = Path(workdir)
         job = {
@@ -99,6 +106,8 @@ def fit_glmm(
             "factors": list(factors), "output": str(work / "result.json"),
         }
         df.to_csv(job["data"], index=False)
+        if theta is not None:
+            job["theta"] = theta
         if newdata is not None:
             job["newdata"] = str(work / "newdata.csv")
             newdata.to_csv(job["newdata"], index=False)

@@ -4,7 +4,8 @@
 #
 # The job is a JSON file with: data (CSV path), formula, family ("gaussian", "poisson" or "nb"),
 # factors (columns to treat as factors), output (JSON path), and optionally newdata (CSV path) for
-# fixed-effects-only predictions with standard errors on the link scale.
+# fixed-effects-only predictions with standard errors on the link scale, and theta (family "nb" only)
+# to fix the negative-binomial dispersion instead of estimating it, which is much faster.
 
 suppressPackageStartupMessages({
   library(lme4)
@@ -23,12 +24,17 @@ read_data <- function(path, factors) {
 # the default optimizer stops short of lme4's gradient tolerance on these models; bobyqa converges
 count_control <- glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5))
 
-fit_model <- function(formula, data, family) {
+fit_negative_binomial <- function(formula, data, theta) {
+  if (is.null(theta)) return(glmer.nb(formula, data = data, control = count_control))
+  glmer(formula, data = data, family = MASS::negative.binomial(theta), control = count_control)
+}
+
+fit_model <- function(formula, data, family, theta) {
   switch(
     family,
     gaussian = lmerTest::lmer(formula, data = data, REML = FALSE),
     poisson = glmer(formula, data = data, family = poisson, control = count_control),
-    nb = glmer.nb(formula, data = data, control = count_control),
+    nb = fit_negative_binomial(formula, data, theta),
     stop("unknown family: ", family)
   )
 }
@@ -63,7 +69,7 @@ predictions <- function(fit, newdata) {
 data <- read_data(job$data, job$factors)
 messages <- character()
 fit <- withCallingHandlers(
-  fit_model(as.formula(job$formula), data, job$family),
+  fit_model(as.formula(job$formula), data, job$family, job$theta),
   warning = function(w) {
     messages <<- c(messages, conditionMessage(w))
     invokeRestart("muffleWarning")
@@ -85,7 +91,7 @@ result <- list(
     converged = length(convergence_problems) == 0,
     messages = messages,
     overdispersion = if (is_count) sum(residuals(fit, type = "pearson")^2) / df.residual(fit) else NA,
-    theta = if (job$family == "nb") getME(fit, "glmer.nb.theta") else NA
+    theta = if (job$family != "nb") NA else if (!is.null(job$theta)) job$theta else getME(fit, "glmer.nb.theta")
   ),
   fixed_effects = fixed_effects(fit),
   variance_components = variance_components(fit)
