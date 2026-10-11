@@ -130,7 +130,11 @@ Decisions already taken, each of which needs re-arguing before it is changed:
 - **FWCI excludes age from its model**, since OpenAlex normalizes it by field, year, and
   document type. Venue is *not* baked in, and is a plausible mediator rather than a confounder
   (sharers publish in higher-impact venues), so report both the unadjusted and the
-  venue-adjusted model and read the difference as mechanism, not as nuisance.
+  venue-adjusted model and read the difference as mechanism, not as nuisance. In nb 09 the
+  unadjusted one is Model 0: OLS with no venue term and standard errors clustered by venue (CR1, t on
+  G - 1 = 22 df, since there are only 23 venues). A venue-free model cannot absorb the within-venue
+  correlation (ICC about 0.07, about 10 articles per venue, design effect about 1.6) through a random
+  effect, because a random intercept also conditions on venue and so is not venue-free.
 - **Superseded v1 analyses stay in the notebooks**, clearly marked as superseded, so the
   published results remain reproducible. They do not appear in the revised manuscript.
 
@@ -274,7 +278,11 @@ changing the text too.
 If a refactor moves any of these, it is a regression until proven otherwise.
 
 - **FWCI**: sharing > non-sharing, one-sided Mann-Whitney p = 0.04, medians 1.20 vs 0.92.
-  Effect is small (r_rb = 0.14, CLES = 0.57).
+  Effect is small (r_rb = 0.14, CLES = 0.57). The Mann-Whitney test ignores venue clustering, and the
+  multivariable models on `log(imputed FWCI)` (nb 09) are all null: the sharing coefficient is
+  b = 0.172 (cluster-robust p = 0.19) with no venue term (Model 0), 0.092 (p = 0.54) with venue impact
+  (Model 1), 0.126 (p = 0.41) with a venue random intercept (Model 2), and 0.072 (p = 0.64) with both
+  (Model 3). Adjusting for venue about halves the estimate, in line with venue as a mediator.
 - **Multivariable citation models (nb 07)**: the sharing coefficient is null in all three: b = 0.075
   (p = 0.56), 0.092 (p = 0.48), 0.044 (p = 0.73) for Models 1-3. In Model 3, venue impact is
   significant (b = 0.170, p = 0.012) and log age dominates (b = 1.12, p < 0.001). The univariate
