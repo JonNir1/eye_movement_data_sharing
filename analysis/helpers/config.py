@@ -4,11 +4,16 @@
 notebooks resolve data files identically no matter where the kernel was started.
 """
 
+import os
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 OUTPUT_DIR = PROJECT_ROOT / "output"
+
+# R library holding lme4 and friends, for the mixed models statsmodels cannot fit (see `helpers/r_models.py`).
+# `R_LIBS_USER` wins when it is set.
+R_LIBRARY_DIR = Path(os.environ.get("R_LIBS_USER", r"C:\Users\nirjo\R_library\4.5"))
 
 # `data_store/` holds both the derived parquet frames *and* the source data they are built
 # from: the Godwin corpus and the frozen OpenAlex snapshot. Neither source file is reproducible
