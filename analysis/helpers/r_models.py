@@ -119,7 +119,7 @@ def fit_glmm(
     return GlmmResult(
         family=family, formula=formula,
         fixed_effects=_parse_fixed_effects(raw["fixed_effects"], family),
-        fit=raw["fit"],
+        fit={key: (np.nan if value is None else value) for key, value in raw["fit"].items()},
         variance_components=pd.DataFrame(raw["variance_components"]),
         predictions=predictions,
     )
