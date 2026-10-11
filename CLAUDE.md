@@ -107,6 +107,16 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   each, and the sharing effect is compared across all three (AIC/BIC are deliberately not used).
   The granularity comparison repeats the three models on the 80 sharers only (baseline PARTICIPANT),
   with one omnibus Wald test per model.
+- **Citation dynamics is one mixed-effects model of yearly citation flow (nb 08)**, fitted in R with
+  lme4 (`helpers.r_models.fit_glmm`): `citations ~ is_sharing_data * k + has_us_author +
+  is_open_access + has_preprint + log_number_of_authors + venue_impact + factor(publication_year) +
+  (1 | venue_name/article)`. Articles are nested in venues; publication year is a categorical fixed
+  effect, and `log_weeks_since_pub` is left out because cohort and k already carry age. Gaussian,
+  Poisson and negative-binomial fits are compared, on AIC for Poisson vs. NB only (a Gaussian density
+  is not comparable to a count pmf). The sharing main effect is the group difference at k = 0, the
+  excluded publication year, so it is not interpreted: the `is_sharing_data:k` interaction is. A
+  linear k is kept unless log(k) lowers the AIC by more than 2. Count fits use the bobyqa optimizer;
+  `glmer.nb` takes about two minutes per fit.
 - **FWCI is the declared primary endpoint**, as it was in v1. The other two citation DVs are
   secondary operationalizations. No multiplicity correction across the three: they are near
   functions of the same counts, so the effective number of tests is close to one. BH still
@@ -123,17 +133,9 @@ Still open:
 - **Bayes factors are not implemented anywhere.** This is the one reviewer request the current
   plan does not touch, and it is what would let the null sharing effect be reported as evidence
   for the null rather than hedged.
-- **How citation dynamics is fitted.** The analysis stays (see above); the current
-  implementation does not. Year-by-year Mann-Whitney tests with N falling from 234 to 84, FDR
-  correction across years, and a 20-article minimum threshold are all to be replaced by a single
-  model: citations in year *k* regressed on sharing x *k* plus the covariates, with random
-  intercepts per article and per venue. Modelling the annual *increment* rather than the
-  cumulative stock matters, since cumulative counts are autocorrelated by construction (year *k*
-  contains year *k*-1). `dataset.citations_since_publication()` already returns the long frame
-  this needs. The trajectory figure stays as description. See the TODO at the bottom of nb 08.
-
-  Open within this: whether venue and publication year enter as random effects or as categorical
-  fixed effects. Also worth one sentence in the manuscript on why time is binned annually, since
+- **Citation dynamics by sharing granularity (nb 08).** The sharing vs. non-sharing model is
+  implemented (see "Decisions already taken"); the same model with `sharing_class * k` on the 80
+  sharers is not yet. Also worth one sentence in the manuscript on why time is binned annually, since
   the reviewer's page-6 comment suggests expressing things in weeks: OpenAlex serves
   `counts_by_year`, so annual is the finest resolution the source supports.
 
@@ -273,7 +275,13 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   one-sided t-test on `log(1 + citations)` is also null (t = 0.40, p = 0.35, d = 0.06).
 - **Age-adjusted residuals** (v1, superseded, nb 07): sharers accrue ~17.8% more citations, but only marginally
   (t(232) = 1.38, p = 0.085, d = 0.19).
-- **Citation dynamics**: significant cumulative advantage in Years 1-4, marginal in 5-7,
+- **Citation dynamics, model (nb 08)**: negative binomial beats Poisson on AIC (5574.3 vs 5636.7;
+  Poisson overdispersion ratio 1.05, NB theta 11.5), and log(k) does not improve on k (AIC -0.9). The
+  `is_sharing_data:k` rate ratio is 0.939 (95% CI 0.902 to 0.978, p = 0.0025): sharing articles'
+  yearly citations fall about 6% per year relative to non-sharing ones. Poisson gives 0.944
+  (p = 0.0007) and Gaussian b = -0.21 citations/year (p = 0.0056). Predicted citations for a typical
+  article run from 2.6 to 2.1 (sharing) and 2.1 to 2.5 (non-sharing) over k = 1 to 8.
+- **Citation dynamics** (v1, superseded, nb 08): significant cumulative advantage in Years 1-4, marginal in 5-7,
   null by Year 8. Citation *velocity* differs only in Year 1 — read as early visibility
   rather than a sustained rate difference. Attrition caveat: N = 234 at Year 1 falls to
   84 by Year 7, with only 19 sharers left.
