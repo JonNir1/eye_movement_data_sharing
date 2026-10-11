@@ -60,7 +60,7 @@ between notebooks.
 | `09_fwci` | Do sharing articles score higher on field-weighted impact? |
 
 `analysis/helpers/` holds only code that two or more notebooks import (`config`, `dataset`,
-`stats`, `plotting`). Single-notebook helpers stay inline on purpose. There is no
+`stats`, `plotting`, `r_models`). Single-notebook helpers stay inline on purpose. There is no
 `__init__.py` anywhere — these are namespace packages, and helper modules use absolute
 imports (`from helpers.config import ...`).
 
@@ -146,6 +146,14 @@ Use the project venv — the system Python does not have the required packages:
 ```
 
 Python 3.14. Dependencies in `requirements.txt`.
+
+**R** (4.5.2) is used only for the mixed models `statsmodels` cannot fit (Poisson and negative-binomial
+LMEs in nb 08), through `lme4`. The package library is `C:\Users\nirjo\R_library\4.5`, and `R_LIBS_USER`
+must point at it (`helpers.config.R_LIBRARY_DIR` does, unless the variable is already set). It holds
+`lme4` 2.0-1, `lmerTest`, `glmmTMB`, `broom.mixed`, `emmeans`, `performance` and `jsonlite`; `DHARMa` and
+`car` are **not** installed. `Rscript` is `C:\Program Files\R\R-4.5.2\bin\Rscript.exe`. Models are fitted by
+`helpers.r_models.fit_glmm()`, which runs `helpers/fit_glmm.R` as a subprocess and reads the results back as
+JSON: there is no `rpy2` in the venv, and none should be added.
 
 **Run notebooks with `analysis/` as the working directory.** The Jupyter kernel puts the
 notebook's own directory first on `sys.path`, which is the whole reason `from helpers
