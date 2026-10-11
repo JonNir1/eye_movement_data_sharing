@@ -109,7 +109,8 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   correlation in the variance (CR1, t on G - 1 df: 22 for the 23 venues, 19 for the sharers-only
   granularity models), since a random intercept would also condition on venue. Convergence, R^2 and
   venue ICC are shown for each, and the sharing effect is compared across all four (AIC/BIC are
-  deliberately not used). The granularity comparison repeats the four models on the 80 sharers only
+  deliberately not used); nb 07 and nb 09 share `helpers.stats.model_diagnostics` and `sharing_effect`
+  for this. The granularity comparison repeats the four models on the 80 sharers only
   (baseline PARTICIPANT), with one omnibus Wald test per model.
 - **Citation dynamics is one mixed-effects model of yearly citation flow (nb 08)**, fitted in R with
   lme4 (`helpers.r_models.fit_glmm`): `citations ~ is_sharing_data * k + has_us_author +
@@ -286,7 +287,8 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   multivariable models on `log(imputed FWCI)` (nb 09) are all null: the sharing coefficient is
   b = 0.172 (cluster-robust p = 0.19) with no venue term (Model 0), 0.092 (p = 0.54) with venue impact
   (Model 1), 0.126 (p = 0.41) with a venue random intercept (Model 2), and 0.072 (p = 0.64) with both
-  (Model 3). Adjusting for venue about halves the estimate, in line with venue as a mediator.
+  (Model 3). Adjusting for venue about halves the estimate, in line with venue as a mediator. The
+  models explain little: marginal R^2 0.06 (Model 0) to 0.09 (Model 3), venue ICC about 0.06.
 - **Multivariable citation models (nb 07)**: the sharing coefficient is null in all four: b = 0.137
   (cluster-robust p = 0.16) with no venue term (Model 0), then 0.075 (p = 0.56), 0.092 (p = 0.48) and
   0.044 (p = 0.73) for Models 1-3, so adjusting for venue cuts the estimate by about two thirds. In

@@ -1,5 +1,5 @@
-"""Group-comparison tests and significance labels shared by the correlation, sharing-vs-features
-and citation-count notebooks.
+"""Group-comparison tests, significance labels and regression summaries shared by the correlation,
+sharing-vs-features, citation-count and FWCI notebooks.
 
 Moved verbatim from the original `citations_for_data_sharing.ipynb` (cell 51). The only change
 is that `BINARY_FEATURES` is imported from `helpers.config` rather than read off the notebook
@@ -11,6 +11,7 @@ from typing import Dict, Literal, Union
 import numpy as np
 import pandas as pd
 import pingouin as pg
+import statsmodels.api as sm
 from scipy import stats
 
 from helpers.config import BINARY_FEATURES
@@ -28,6 +29,49 @@ def significance_class(q: float) -> Union[str, float]:
     if q < 0.05:
         return "*"
     return "n.s."
+
+
+def percent_difference(b: float) -> float:
+    """The outcome is on the log scale, so `exp(b) - 1` is the proportional difference, in percent."""
+    return 100 * (np.exp(b) - 1)
+
+
+def nakagawa_r2(result) -> tuple[float, float]:
+    """Marginal (fixed effects only) and conditional (fixed effects + venue) R^2 of a `MixedLM` fit
+    with one random intercept."""
+    fixed_var = np.var(result.model.exog @ result.fe_params.values)
+    venue_var = result.cov_re.iloc[0, 0]
+    total_var = fixed_var + venue_var + result.scale
+    return fixed_var / total_var, (fixed_var + venue_var) / total_var
+
+
+def model_diagnostics(result) -> dict:
+    """Convergence, N, R^2 and the venue ICC of a fitted OLS or `MixedLM` model. OLS has no random
+    effect, so its marginal and conditional R^2 are both its R^2, and it has no ICC."""
+    if not isinstance(result.model, sm.MixedLM):
+        return {
+            "converged": "n/a", "N": int(result.nobs),
+            "R2 marginal": result.rsquared, "R2 conditional": result.rsquared, "ICC": np.nan,
+        }
+    marginal, conditional = nakagawa_r2(result)
+    venue_var = result.cov_re.iloc[0, 0]
+    return {
+        "converged": result.converged, "N": int(result.nobs),
+        "R2 marginal": marginal, "R2 conditional": conditional,
+        "ICC": venue_var / (venue_var + result.scale),
+    }
+
+
+def sharing_effect(result, term: str) -> dict:
+    """Effect of the coefficient named `term` (e.g. `C(is_sharing_data)[T.1]`) in a fitted model, with
+    its Wald CI and, for a log-scale outcome, the same effect as a percent difference."""
+    ci_low, ci_high = result.conf_int().loc[term]
+    return {
+        "b": result.params[term], "SE": result.bse[term], "p": result.pvalues[term],
+        "CI low": ci_low, "CI high": ci_high,
+        "% diff": percent_difference(result.params[term]),
+        "% diff CI low": percent_difference(ci_low), "% diff CI high": percent_difference(ci_high),
+    }
 
 
 def compare_binary(

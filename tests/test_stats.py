@@ -10,9 +10,13 @@ statistic the manuscript ends up quoting.
 import numpy as np
 import pandas as pd
 import pytest
+import statsmodels.formula.api as smf
 
 from helpers.config import SHARING_CLASS_ORDER
-from helpers.stats import _calculate_group_stats, compare_binary, compare_continuous, significance_class
+from helpers.stats import (
+    _calculate_group_stats, compare_binary, compare_continuous, model_diagnostics, percent_difference,
+    sharing_effect, significance_class,
+)
 
 SHARE_COL = "Is Sharing Data"
 
@@ -302,3 +306,39 @@ class TestSignificanceClass:
     @pytest.mark.parametrize("q", [np.nan, None, -0.1])
     def test_missing_or_negative_is_nan(self, q):
         assert np.isnan(significance_class(q))
+
+
+class TestRegressionSummaries:
+    @staticmethod
+    def _make_data(seed: int = 0, n_venues: int = 8, per_venue: int = 15) -> pd.DataFrame:
+        rng = np.random.default_rng(seed)
+        venue = np.repeat([f"v{i}" for i in range(n_venues)], per_venue)
+        sharing = rng.integers(0, 2, size=venue.size)
+        venue_effect = dict(zip(sorted(set(venue)), rng.normal(scale=0.5, size=n_venues)))
+        y = 0.4 * sharing + np.array([venue_effect[v] for v in venue]) + rng.normal(size=venue.size)
+        return pd.DataFrame({"y": y, "is_sharing_data": sharing, "venue_name": venue})
+
+    def test_percent_difference_is_exp_b_minus_one(self):
+        assert percent_difference(0.0) == 0.0
+        assert percent_difference(np.log(1.25)) == pytest.approx(25.0)
+
+    def test_sharing_effect_reports_the_coefficient_and_its_percent_difference(self):
+        fit = smf.ols("y ~ C(is_sharing_data)", self._make_data()).fit()
+        effect = sharing_effect(fit, "C(is_sharing_data)[T.1]")
+        assert effect["b"] == pytest.approx(fit.params["C(is_sharing_data)[T.1]"])
+        assert effect["% diff"] == pytest.approx(percent_difference(effect["b"]))
+        assert effect["CI low"] < effect["b"] < effect["CI high"]
+
+    def test_diagnostics_of_an_ols_fit_have_no_icc(self):
+        fit = smf.ols("y ~ C(is_sharing_data)", self._make_data()).fit()
+        diagnostics = model_diagnostics(fit)
+        assert diagnostics["converged"] == "n/a" and np.isnan(diagnostics["ICC"])
+        assert diagnostics["R2 marginal"] == diagnostics["R2 conditional"] == pytest.approx(fit.rsquared)
+
+    def test_diagnostics_of_a_mixed_fit_split_marginal_and_conditional_r2(self):
+        data = self._make_data()
+        fit = smf.mixedlm("y ~ C(is_sharing_data)", data, groups=data["venue_name"]).fit(reml=False)
+        diagnostics = model_diagnostics(fit)
+        assert diagnostics["N"] == len(data)
+        assert 0 <= diagnostics["R2 marginal"] <= diagnostics["R2 conditional"] <= 1
+        assert 0 <= diagnostics["ICC"] < 1
