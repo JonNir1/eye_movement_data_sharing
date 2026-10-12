@@ -85,8 +85,9 @@ result <- list(
   fit = list(
     n_obs = nobs(fit),
     log_lik = as.numeric(logLik(fit)),
-    # a Gaussian density and a count pmf are not comparable, so AIC is only reported for count families
-    aic = if (is_count) AIC(fit) else NA,
+    # AIC is only comparable between fits of the same family and outcome (a Gaussian density and a count
+    # pmf, or two Gaussians on different outcomes, are not), so callers decide what to compare
+    aic = AIC(fit),
     singular = isSingular(fit),
     converged = length(convergence_problems) == 0,
     messages = messages,
