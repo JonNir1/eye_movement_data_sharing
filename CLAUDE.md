@@ -56,8 +56,8 @@ between notebooks.
 | `05_sharing_and_article_features` | Is sharing associated with other article characteristics? |
 | `06_citation_descriptives` | What do the citation and impact outcomes look like, overall and by sharing status, before any modelling? |
 | `07_citation_counts` | Do sharing articles accrue more citations, univariately and after adjusting for the other predictors (OLS and mixed-effects models)? |
-| `08_citation_dynamics` | When does the advantage appear, and does it persist? |
-| `09_fwci` | Do sharing articles score higher on field-weighted impact? |
+| `08_fwci` | Do sharing articles score higher on field-weighted impact? |
+| `09_citation_dynamics` | When does the advantage appear, and does it persist? |
 
 `analysis/helpers/` holds only code that two or more notebooks import (`config`, `dataset`,
 `stats`, `plotting`, `r_models`). Single-notebook helpers stay inline on purpose. There is no
@@ -76,8 +76,8 @@ Results order in the revised manuscript:
 1. feature descriptives and appendix figures (nb 02, with the transformation checks in nb 03)
 2. sharing status against the other article features (nb 05)
 3. multivariable regression on the shared-year citation count: age and venue dominate, sharing is null (nb 07; four models, see below)
-4. citation dynamics, year by year post-publication (nb 08)
-5. FWCI (nb 09)
+4. FWCI (nb 08)
+5. citation dynamics, year by year post-publication (nb 09)
 
 Decisions already taken, each of which needs re-arguing before it is changed:
 
@@ -90,7 +90,7 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   `log_weeks_since_pub` rather than equalizing it by construction, so the two were near functions
   of the same counts. Sweeping k, or re-running the shared-year count at an earlier cutoff, only
   discards citations; the temporal question either would gesture at is answered directly by the
-  year-by-year model in nb 08. Report the one determined cutoff; do not sweep it.
+  year-by-year model in nb 09. Report the one determined cutoff; do not sweep it.
 - **Citation dynamics stays, as a multivariable model.** The reviewer never asked for the
   year-by-year analysis to go, and it is the only thing in the paper that answers *when* an
   advantage appears, which the aggregate DVs cannot. What has to change is how it is fitted: his
@@ -109,10 +109,10 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   correlation in the variance (CR1, t on G - 1 df: 22 for the 23 venues, 19 for the sharers-only
   granularity models), since a random intercept would also condition on venue. Convergence, R^2 and
   venue ICC are shown for each, and the sharing effect is compared across all four (AIC/BIC are
-  deliberately not used); nb 07 and nb 09 share `helpers.stats.model_diagnostics` and `sharing_effect`
+  deliberately not used); nb 07 and nb 08 share `helpers.stats.model_diagnostics` and `sharing_effect`
   for this, and `granularity_wald_test` for the omnibus test. The granularity comparison repeats the four models on the 80 sharers only
   (baseline PARTICIPANT), with one omnibus Wald test per model.
-- **Citation dynamics is one mixed-effects model of yearly citation flow (nb 08)**, fitted in R with
+- **Citation dynamics is one mixed-effects model of yearly citation flow (nb 09)**, fitted in R with
   lme4 (`helpers.r_models.fit_glmm`): `citations ~ is_sharing_data * k + has_us_author +
   is_open_access + has_preprint + log_number_of_authors + venue_impact + factor(publication_year) +
   (1 | venue_name/article)`. Articles are nested in venues; publication year is a categorical fixed
@@ -135,7 +135,7 @@ Decisions already taken, each of which needs re-arguing before it is changed:
 - **FWCI excludes age from its model**, since OpenAlex normalizes it by field, year, and
   document type. Venue is *not* baked in, and is a plausible mediator rather than a confounder
   (sharers publish in higher-impact venues), so report both the unadjusted and the
-  venue-adjusted model and read the difference as mechanism, not as nuisance. In nb 09 the
+  venue-adjusted model and read the difference as mechanism, not as nuisance. In nb 08 the
   unadjusted one is Model 0: OLS with no venue term and standard errors clustered by venue (CR1, t on
   G - 1 = 22 df, since there are only 23 venues). A venue-free model cannot absorb the within-venue
   correlation (ICC about 0.07, about 10 articles per venue, design effect about 1.6) through a random
@@ -148,7 +148,7 @@ Still open:
 - **Bayes factors are not implemented anywhere.** This is the one reviewer request the current
   plan does not touch, and it is what would let the null sharing effect be reported as evidence
   for the null rather than hedged.
-- **Citation dynamics by sharing granularity (nb 08).** The sharing vs. non-sharing model is
+- **Citation dynamics by sharing granularity (nb 09).** The sharing vs. non-sharing model is
   implemented (see "Decisions already taken"); the same model with `sharing_class * k` on the 80
   sharers is not yet. Also worth one sentence in the manuscript on why time is binned annually, since
   the reviewer's page-6 comment suggests expressing things in weeks: OpenAlex serves
@@ -165,7 +165,7 @@ Use the project venv — the system Python does not have the required packages:
 Python 3.14. Dependencies in `requirements.txt`.
 
 **R** (4.5.2) is used only for the mixed models `statsmodels` cannot fit (Poisson and negative-binomial
-LMEs in nb 08), through `lme4`. The package library is `C:\Users\nirjo\R_library\4.5`, and `R_LIBS_USER`
+LMEs in nb 09), through `lme4`. The package library is `C:\Users\nirjo\R_library\4.5`, and `R_LIBS_USER`
 must point at it (`helpers.config.R_LIBRARY_DIR` does, unless the variable is already set). It holds
 `lme4` 2.0-1, `lmerTest`, `glmmTMB`, `broom.mixed`, `emmeans`, `performance` and `jsonlite`; `DHARMa` and
 `car` are **not** installed. `Rscript` is `C:\Program Files\R\R-4.5.2\bin\Rscript.exe`. Models are fitted by
@@ -284,7 +284,7 @@ If a refactor moves any of these, it is a regression until proven otherwise.
 
 - **FWCI**: sharing > non-sharing, one-sided Mann-Whitney p = 0.04, medians 1.20 vs 0.92.
   Effect is small (r_rb = 0.14, CLES = 0.57). The Mann-Whitney test ignores venue clustering, and the
-  multivariable models on `log(imputed FWCI)` (nb 09) are all null: the sharing coefficient is
+  multivariable models on `log(imputed FWCI)` (nb 08) are all null: the sharing coefficient is
   b = 0.172 (cluster-robust p = 0.19) with no venue term (Model 0), 0.092 (p = 0.54) with venue impact
   (Model 1), 0.126 (p = 0.41) with a venue random intercept (Model 2), and 0.072 (p = 0.64) with both
   (Model 3). Adjusting for venue about halves the estimate, in line with venue as a mediator. The
@@ -297,7 +297,7 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   one-sided t-test on `log(1 + citations)` is also null (t = 0.40, p = 0.35, d = 0.06).
 - **Age-adjusted residuals** (v1, superseded, nb 07): sharers accrue ~17.8% more citations, but only marginally
   (t(232) = 1.38, p = 0.085, d = 0.19).
-- **Citation dynamics, model (nb 08)**: negative binomial beats Poisson on AIC (5574.3 vs 5636.7;
+- **Citation dynamics, model (nb 09)**: negative binomial beats Poisson on AIC (5574.3 vs 5636.7;
   Poisson overdispersion ratio 1.05, NB theta 11.5). With linear k, the `is_sharing_data:k` rate ratio
   is 0.939 (95% CI 0.902 to 0.978, p = 0.0025): sharing articles' yearly citations fall about 6% per
   year relative to non-sharing ones. Poisson gives 0.944 (p = 0.0007) and Gaussian b = -0.21
@@ -307,13 +307,13 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   the sharing main effect at the mean k is null (p = 0.97). Predicted citations for a typical article:
   sharing 2.5, 2.6, 2.5 down to 1.6 and non-sharing 2.1 rising to 2.5 at k = 5 then falling to 2.2,
   over k = 1 to 8.
-- **Citation dynamics** (v1, superseded, nb 08): significant cumulative advantage in Years 1-4, marginal in 5-7,
+- **Citation dynamics** (v1, superseded, nb 09): significant cumulative advantage in Years 1-4, marginal in 5-7,
   null by Year 8. Citation *velocity* differs only in Year 1 — read as early visibility
   rather than a sustained rate difference. Attrition caveat: N = 234 at Year 1 falls to
   84 by Year 7, with only 19 sharers left.
 - **Granularity never matters**: null for FWCI (H = 3.08, p = 0.21), for residuals
   (H = 2.00, p = 0.37), in every post-publication year, in the nb 07 multivariable models
-  (omnibus Wald p = 0.38, 0.41, 0.52, 0.37 for Models 0-3), and in the nb 09 FWCI models on the 80
+  (omnibus Wald p = 0.38, 0.41, 0.52, 0.37 for Models 0-3), and in the nb 08 FWCI models on the 80
   sharers (omnibus Wald p = 0.36, 0.16, 0.25, 0.14 for Models 0-3). As in nb 07, the venue variance of
   Model 3 collapses to about zero on the sharers (ICC 0.002), so it is effectively Model 1.
 - **Covariate comparison**: sharers publish in higher-impact venues, are 4.30x more likely
