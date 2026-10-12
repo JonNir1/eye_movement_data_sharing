@@ -312,8 +312,10 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   rather than a sustained rate difference. Attrition caveat: N = 234 at Year 1 falls to
   84 by Year 7, with only 19 sharers left.
 - **Granularity never matters**: null for FWCI (H = 3.08, p = 0.21), for residuals
-  (H = 2.00, p = 0.37), in every post-publication year, and in the nb 07 multivariable models
-  (omnibus Wald p = 0.38, 0.41, 0.52, 0.37 for Models 0-3).
+  (H = 2.00, p = 0.37), in every post-publication year, in the nb 07 multivariable models
+  (omnibus Wald p = 0.38, 0.41, 0.52, 0.37 for Models 0-3), and in the nb 09 FWCI models on the 80
+  sharers (omnibus Wald p = 0.36, 0.16, 0.25, 0.14 for Models 0-3). As in nb 07, the venue variance of
+  Model 3 collapses to about zero on the sharers (ICC 0.002), so it is effectively Model 1.
 - **Covariate comparison**: sharers publish in higher-impact venues, are 4.30x more likely
   to have a preprint, and are more recent. No difference in author count, U.S. authorship,
   or open-access status.
