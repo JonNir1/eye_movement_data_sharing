@@ -101,11 +101,26 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   DV. Regressing on venue and then t-testing the residuals gives the right point estimate and
   the wrong standard errors.
 - **Venue is modelled four ways in nb 07**, all on `log(1 + citations through the shared year)`:
-  OLS with no venue term and standard errors clustered by venue (Model 0, the total association),
-  OLS with venue impact as a covariate (Model 1), a mixed-effects model with venue as a random
-  intercept (Model 2), and a mixed-effects model with both (Model 3). Model 3 is the most
-  conservative; it is reported beside Model 0, and the difference between them is read as mechanism
-  (see the FWCI decision below: venue is a plausible mediator). Model 0 handles the within-venue
+  OLS with no venue term and standard errors clustered by venue (Model 0), OLS with venue impact as
+  a covariate (Model 1), a mixed-effects model with venue as a random intercept (Model 2), and a
+  mixed-effects model with both (Model 3). Model 3 is the most conservative.
+
+  **Models 0 and 3 bracket the sharing estimate; neither supersedes the other, and the gap between
+  them is not read as a mediated effect.** Venue's causal role is not identified by this corpus. If
+  sharing leads to publication in higher-impact venues, venue is a mediator, Model 0 is the total
+  association and Model 3 the direct one. If a journal's data policy instead drives whether its
+  authors share, venue is a confounder, Model 0 is confounded upward and Model 3 is the estimate of
+  interest. Venue sharing rates running from 0% (*Visual Cognition*, *Journal of Eye Movement
+  Research*) to 82% (*PLoS ONE*) look more like editorial policy than author choice, so the
+  confounder reading is live. Report Model 0 as a bound, not as the preferred estimate.
+
+  The other covariates stay in Model 0 even though they also correlate with sharing, because they
+  are not comparable cases: publication age is a common cause of both sharing and citations (and is
+  this DV's exposure term), so dropping it would confound rather than decompose, and preprint
+  availability is not caused by sharing but reflects the same open-science disposition, placing it
+  beside the sharing predictor rather than downstream of it.
+
+  Model 0 handles the within-venue
   correlation in the variance (CR1, t on G - 1 df: 22 for the 23 venues, 19 for the sharers-only
   granularity models), since a random intercept would also condition on venue. The mixed models
   (2 and 3, in nb 07 and nb 08) are fitted by REML, which gives less biased variance components (venue
@@ -148,9 +163,10 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   functions of the same counts, so the effective number of tests is close to one. BH still
   applies within the nb 05 covariate table, where the tests really are distinct.
 - **FWCI excludes age from its model**, since OpenAlex normalizes it by field, year, and
-  document type. Venue is *not* baked in, and is a plausible mediator rather than a confounder
-  (sharers publish in higher-impact venues), so report both the unadjusted and the
-  venue-adjusted model and read the difference as mechanism, not as nuisance. In nb 08 the
+  document type. Venue is *not* baked in, so report both the unadjusted and the venue-adjusted
+  model. Whether venue is a mediator or a confounder is not identified here, so the pair brackets
+  the estimate and the difference between them is **not** read as mechanism (see the nb 07 venue
+  decision above for the full argument). In nb 08 the
   unadjusted one is Model 0: OLS with no venue term and standard errors clustered by venue (CR1, t on
   G - 1 = 22 df, since there are only 23 venues). A venue-free model cannot absorb the within-venue
   correlation (ICC about 0.08, about 10 articles per venue, design effect about 1.7) through a random
@@ -302,8 +318,10 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   multivariable models on `log(imputed FWCI)` (nb 08) are all null: the sharing coefficient is
   b = 0.172 (cluster-robust p = 0.19) with no venue term (Model 0), 0.092 (p = 0.54) with venue impact
   (Model 1), 0.119 (p = 0.45) with a venue random intercept (Model 2), and 0.067 (p = 0.67) with both
-  (Model 3). Adjusting for venue about halves the estimate, in line with venue as a mediator. The
-  models explain little: marginal R^2 0.06 (Model 0) to 0.09 (Model 3), venue ICC about 0.08.
+  (Model 3). Adjusting for venue about halves the estimate; that is consistent with venue as a
+  mediator but equally with venue as a confounder, so it is reported as a bracket and not as a
+  decomposition. The models explain little: marginal R^2 0.06 (Model 0) to 0.09 (Model 3), venue
+  ICC about 0.08.
 - **Multivariable citation models (nb 07)**: the sharing coefficient is null in all four: b = 0.137
   (cluster-robust p = 0.16) with no venue term (Model 0), then 0.075 (p = 0.55), 0.086 (p = 0.52) and
   0.038 (p = 0.77) for Models 1-3, so adjusting for venue cuts the estimate by about 70%. In
