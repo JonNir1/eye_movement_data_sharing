@@ -116,18 +116,29 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   lme4 (`helpers.r_models.fit_glmm`): `citations ~ is_sharing_data * k + has_us_author +
   is_open_access + has_preprint + log_number_of_authors + venue_impact + factor(publication_year) +
   (1 | venue_name/article)`. Articles are nested in venues; publication year is a categorical fixed
-  effect, and `log_weeks_since_pub` is left out because cohort and k already carry age. Gaussian,
-  Poisson and negative-binomial fits are compared, on AIC for Poisson vs. NB only (a Gaussian density
-  is not comparable to a count pmf). The sharing main effect is the group difference at k = 0, the
+  effect, and `log_weeks_since_pub` is left out because cohort and k already carry age. Four fits go
+  through the same R bridge: **the primary is a Gaussian on `log(1 + citations)`, chosen a priori and
+  not by AIC**, with the raw-count Gaussian, Poisson and negative binomial as reference and robustness
+  fits. Thelwall & Wilson (2014) recommend adding one, taking the log and using the general linear
+  model for citation data, and their simulations cover this regime (the yearly flow fits a discrete
+  lognormal, mu = 0.63, sigma = 1.19): there `log(x + 1)` keeps the nominal 5% false-positive rate and
+  is the most powerful trustworthy option, while negative binomial regression falsely flags factors
+  about 3x too often at log-SD 1 and about half the time at log-SD 2, worsening with sample size, so
+  its conclusions cannot be trusted. The discrete lognormal they prefer has no mixed-model
+  implementation, so `log(1 + y)` is the stand-in. The `+ 1` is not driving the result (the notebook's
+  offset-sensitivity table: dropping the zeros gives b = -0.042, the same as with `+ 1`). AIC compares
+  only Poisson with NB (a Gaussian density is not comparable to a count pmf, nor to a Gaussian on
+  another outcome); it never picks the primary. The sharing main effect is the group difference at k = 0, the
   excluded publication year, so it is not interpreted: the sharing-by-time interaction is. Time is
-  tried as `k`, `log(k)` and a quadratic `k + k^2`, and the simplest is kept unless another lowers the
-  AIC by more than 2. The quadratic has the same curvature in both groups, i.e. `is_sharing_data * k_z
-  + I(k_z^2)` with no sharing x k^2 interaction (not supported, LRT p = 0.31), so the sharing
-  difference stays linear in time and one coefficient summarizes it. It is fitted on standardized k
-  (`k_z`, the same model): raw k and k^2 are nearly collinear and lme4 does not converge on them. Count fits use the bobyqa
-  optimizer. `glmer.nb` estimates theta in an outer loop and takes about two minutes per fit, so the
-  `log(k)` and quadratic refits hold theta at the value estimated for `k` (`fit_glmm(theta=...)`, which
-  reproduces the `glmer.nb` AIC to two decimals); their AICs are therefore conditional on that theta.
+  tried as `k`, `log(k)` and a quadratic `k + k^2`, within the primary family (where the AIC is
+  comparable), and the simplest is kept unless another lowers the AIC by more than 2. The quadratic has
+  the same curvature in both groups, i.e. `is_sharing_data * k_z + I(k_z^2)` with no sharing x k^2
+  interaction (rejected on the NB fit, LRT p = 0.31, and not re-tested on the Gaussian), so the
+  sharing difference stays linear in time and one coefficient summarizes it. It is fitted on
+  standardized k (`k_z`, the same model): raw k and k^2 are nearly collinear and lme4 does not converge
+  on them. Count fits use the bobyqa optimizer. `glmer.nb` estimates theta in an outer loop and takes
+  about two minutes per fit (the only slow fit now); `fit_glmm(theta=...)` holds it fixed, which
+  reproduces the `glmer.nb` AIC to two decimals.
 - **FWCI is the declared primary endpoint**, as it was in v1. The other two citation DVs are
   secondary operationalizations. No multiplicity correction across the three: they are near
   functions of the same counts, so the effective number of tests is close to one. BH still
@@ -165,7 +176,7 @@ Use the project venv — the system Python does not have the required packages:
 Python 3.14. Dependencies in `requirements.txt`.
 
 **R** (4.5.2) is used only for the mixed models `statsmodels` cannot fit (Poisson and negative-binomial
-LMEs in nb 09), through `lme4`. The package library is `C:\Users\nirjo\R_library\4.5`, and `R_LIBS_USER`
+LMEs in nb 09, and the Gaussian one they are compared with), through `lme4`. The package library is `C:\Users\nirjo\R_library\4.5`, and `R_LIBS_USER`
 must point at it (`helpers.config.R_LIBRARY_DIR` does, unless the variable is already set). It holds
 `lme4` 2.0-1, `lmerTest`, `glmmTMB`, `broom.mixed`, `emmeans`, `performance` and `jsonlite`; `DHARMa` and
 `car` are **not** installed. `Rscript` is `C:\Program Files\R\R-4.5.2\bin\Rscript.exe`. Models are fitted by
@@ -297,16 +308,24 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   one-sided t-test on `log(1 + citations)` is also null (t = 0.40, p = 0.35, d = 0.06).
 - **Age-adjusted residuals** (v1, superseded, nb 07): sharers accrue ~17.8% more citations, but only marginally
   (t(232) = 1.38, p = 0.085, d = 0.19).
-- **Citation dynamics, model (nb 09)**: negative binomial beats Poisson on AIC (5574.3 vs 5636.7;
-  Poisson overdispersion ratio 1.05, NB theta 11.5). With linear k, the `is_sharing_data:k` rate ratio
-  is 0.939 (95% CI 0.902 to 0.978, p = 0.0025): sharing articles' yearly citations fall about 6% per
-  year relative to non-sharing ones. Poisson gives 0.944 (p = 0.0007) and Gaussian b = -0.21
-  citations/year (p = 0.0056). Time term: log(k) does not improve on k (AIC -0.9), but the shared
-  quadratic does (AIC -6.5, so it is the one used). In it the sharing-by-time slope is b = -0.142 per SD
-  of k (about 2 years; rate ratio 0.87, p = 0.0009), the common curvature is negative (p = 0.003), and
-  the sharing main effect at the mean k is null (p = 0.97). Predicted citations for a typical article:
-  sharing 2.5, 2.6, 2.5 down to 1.6 and non-sharing 2.1 rising to 2.5 at k = 5 then falling to 2.2,
-  over k = 1 to 8.
+- **Citation dynamics, primary model (nb 09)**: Gaussian on `log(1 + citations)`, converged and not
+  singular (venue variance 0.025, article-within-venue 0.283, residual 0.239). With linear k, the
+  `is_sharing_data:k` coefficient is b = -0.0416 (SE 0.0160, p = 0.0094): sharing articles' yearly
+  citations fall about 4% per year relative to non-sharing ones (`exp(b) - 1`, on `1 + citations`).
+  Offset sensitivity (coefficients are on different scales, so compare |t|): `log(y + 0.5)` b = -0.051
+  (|t| 2.48), `+ 0.25` b = -0.061 (2.34), `+ 0.1` b = -0.073 (2.15), zeros dropped (N = 1117) b = -0.042
+  (2.10), against 2.60 for `+ 1`. Time term, within this family: log(k) does not improve on k (AIC
+  +0.5), but the shared quadratic does (AIC -6.3, so it is the one used); in it the sharing-by-time
+  slope is b = -0.093 per SD of k (SE 0.033, p = 0.0043). Predicted citations (geometric-mean scale)
+  for a typical article: sharing 2.4, 2.5, 2.4 down to 1.4 and non-sharing 2.1 rising to 2.4 at
+  k = 4 then falling to 2.0, over k = 1 to 8.
+- **Citation dynamics, robustness fits (nb 09)**: negative binomial beats Poisson on AIC (5574.3 vs
+  5636.7; Poisson overdispersion ratio 1.05, NB theta 11.5). With linear k, the NB `is_sharing_data:k`
+  rate ratio is 0.939 (95% CI 0.902 to 0.978, p = 0.0025): about 6% fewer yearly citations per year.
+  Poisson gives 0.944 (p = 0.0007) and the raw-count Gaussian b = -0.21 citations/year (p = 0.0056).
+  On the NB fit the shared quadratic also wins (AIC -6.5) with a sharing-by-slope of b = -0.142 per SD
+  of k (rate ratio 0.87, p = 0.0009), a negative common curvature (p = 0.003) and a null sharing main
+  effect at the mean k (p = 0.97). All four families agree on the sign and significance.
 - **Citation dynamics** (v1, superseded, nb 09): significant cumulative advantage in Years 1-4, marginal in 5-7,
   null by Year 8. Citation *velocity* differs only in Year 1 — read as early visibility
   rather than a sustained rate difference. Attrition caveat: N = 234 at Year 1 falls to
