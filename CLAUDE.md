@@ -107,7 +107,11 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   conservative; it is reported beside Model 0, and the difference between them is read as mechanism
   (see the FWCI decision below: venue is a plausible mediator). Model 0 handles the within-venue
   correlation in the variance (CR1, t on G - 1 df: 22 for the 23 venues, 19 for the sharers-only
-  granularity models), since a random intercept would also condition on venue. Convergence, R^2 and
+  granularity models), since a random intercept would also condition on venue. The mixed models
+  (2 and 3, in nb 07 and nb 08) are fitted by REML, which gives less biased variance components (venue
+  variance, ICC, R^2) with only 23 venues; ML would only be needed to compare fixed-effects structures
+  by AIC or likelihood ratio, which these notebooks do not do (nb 09's R fits are ML, because its
+  time-term comparison changes the fixed effects). Convergence, R^2 and
   venue ICC are shown for each, and the sharing effect is compared across all four (AIC/BIC are
   deliberately not used); nb 07 and nb 08 share `helpers.stats.model_diagnostics` and `sharing_effect`
   for this, and `granularity_wald_test` for the omnibus test. The granularity comparison repeats the four models on the 80 sharers only
@@ -149,7 +153,7 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   venue-adjusted model and read the difference as mechanism, not as nuisance. In nb 08 the
   unadjusted one is Model 0: OLS with no venue term and standard errors clustered by venue (CR1, t on
   G - 1 = 22 df, since there are only 23 venues). A venue-free model cannot absorb the within-venue
-  correlation (ICC about 0.07, about 10 articles per venue, design effect about 1.6) through a random
+  correlation (ICC about 0.08, about 10 articles per venue, design effect about 1.7) through a random
   effect, because a random intercept also conditions on venue and so is not venue-free.
 - **Superseded v1 analyses stay in the notebooks**, clearly marked as superseded, so the
   published results remain reproducible. They do not appear in the revised manuscript.
@@ -297,13 +301,13 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   Effect is small (r_rb = 0.14, CLES = 0.57). The Mann-Whitney test ignores venue clustering, and the
   multivariable models on `log(imputed FWCI)` (nb 08) are all null: the sharing coefficient is
   b = 0.172 (cluster-robust p = 0.19) with no venue term (Model 0), 0.092 (p = 0.54) with venue impact
-  (Model 1), 0.126 (p = 0.41) with a venue random intercept (Model 2), and 0.072 (p = 0.64) with both
+  (Model 1), 0.119 (p = 0.45) with a venue random intercept (Model 2), and 0.067 (p = 0.67) with both
   (Model 3). Adjusting for venue about halves the estimate, in line with venue as a mediator. The
-  models explain little: marginal R^2 0.06 (Model 0) to 0.09 (Model 3), venue ICC about 0.06.
+  models explain little: marginal R^2 0.06 (Model 0) to 0.09 (Model 3), venue ICC about 0.08.
 - **Multivariable citation models (nb 07)**: the sharing coefficient is null in all four: b = 0.137
-  (cluster-robust p = 0.16) with no venue term (Model 0), then 0.075 (p = 0.56), 0.092 (p = 0.48) and
-  0.044 (p = 0.73) for Models 1-3, so adjusting for venue cuts the estimate by about two thirds. In
-  Model 3, venue impact is significant (b = 0.170, p = 0.012) and log age dominates (b = 1.12,
+  (cluster-robust p = 0.16) with no venue term (Model 0), then 0.075 (p = 0.55), 0.086 (p = 0.52) and
+  0.038 (p = 0.77) for Models 1-3, so adjusting for venue cuts the estimate by about 70%. In
+  Model 3, venue impact is significant (b = 0.180, p = 0.013) and log age dominates (b = 1.12,
   p < 0.001). The univariate
   one-sided t-test on `log(1 + citations)` is also null (t = 0.40, p = 0.35, d = 0.06).
 - **Age-adjusted residuals** (v1, superseded, nb 07): sharers accrue ~17.8% more citations, but only marginally
@@ -332,9 +336,10 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   84 by Year 7, with only 19 sharers left.
 - **Granularity never matters**: null for FWCI (H = 3.08, p = 0.21), for residuals
   (H = 2.00, p = 0.37), in every post-publication year, in the nb 07 multivariable models
-  (omnibus Wald p = 0.38, 0.41, 0.52, 0.37 for Models 0-3), and in the nb 08 FWCI models on the 80
-  sharers (omnibus Wald p = 0.36, 0.16, 0.25, 0.14 for Models 0-3). As in nb 07, the venue variance of
-  Model 3 collapses to about zero on the sharers (ICC 0.002), so it is effectively Model 1.
+  (omnibus Wald p = 0.38, 0.41, 0.56, 0.44 for Models 0-3), and in the nb 08 FWCI models on the 80
+  sharers (omnibus Wald p = 0.36, 0.16, 0.29, 0.16 for Models 0-3). In nb 08 the venue variance of
+  Model 3 still collapses to about zero on the sharers (ICC 0.0002), so it is effectively Model 1; in
+  nb 07 it no longer does under REML (ICC 0.03).
 - **Covariate comparison**: sharers publish in higher-impact venues, are 4.30x more likely
   to have a preprint, and are more recent. No difference in author count, U.S. authorship,
   or open-access status.
