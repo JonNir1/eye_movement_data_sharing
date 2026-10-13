@@ -185,6 +185,38 @@ Still open:
   the reviewer's page-6 comment suggests expressing things in weeks: OpenAlex serves
   `counts_by_year`, so annual is the finest resolution the source supports.
 
+## For the discussion
+
+Points that belong in the Discussion rather than the Results, parked here so they are not
+rediscovered or lost. Nothing here is written yet.
+
+- **The venue mechanism, and the venue-free estimates.** Results report only Model 3, the most
+  conservative specification, which keeps that section short and avoids specifying four models in
+  the Methods. The venue-free estimates belong here instead, in a paragraph on what venue is doing:
+  `b = 0.14, p = 0.16` for citation counts (nb 07) and `b = 0.17, p = 0.19` for FWCI (nb 08), against
+  `0.04` and `0.07` once venue is adjusted for. Adjusting for venue cuts the estimate by roughly 70%
+  and 60% respectively, and both ends of that range are null.
+
+  The paragraph's job is to lay out the two readings without picking one, since this corpus cannot
+  settle the direction (see the nb 07 venue decision above). Either higher-impact journals *require*
+  sharing through their data policies, making venue a confounder, or sharing *leads to* publication
+  in higher-impact venues, making it a mediator. The 0% to 82% spread in venue sharing rates favours
+  the policy reading, but it is suggestive, not decisive. Say that the conclusion holds either way.
+
+- **Robustness, with a pointer to the code.** One sentence that the findings hold across model
+  specifications (with and without venue, as fixed effect, as random intercept, or both) and across
+  distribution families, referencing the GitHub repository. The specification range is what makes
+  this defensible, so it is worth stating even though the Results report a single model.
+
+- **Why time is binned annually (nb 09).** The reviewer's page-6 comment asks whether things could
+  be expressed in weeks. OpenAlex serves `counts_by_year`, so annual is the finest resolution the
+  source supports. One sentence, or the comment reads as unaddressed.
+
+- **Journal impact is a current value applied retrospectively.** OpenAlex serves no historical
+  journal metrics, so two-year mean citedness is today's value attached to articles published up to
+  nine years earlier. This is already in "Conventions" as a repo note; it needs to reach the
+  manuscript text wherever the feature is used.
+
 ## Environment
 
 Use the project venv — the system Python does not have the required packages:
