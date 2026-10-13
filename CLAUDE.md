@@ -57,7 +57,7 @@ between notebooks.
 | `06_citation_descriptives` | What do the citation and impact outcomes look like, overall and by sharing status, before any modelling? |
 | `07_citation_counts` | Do sharing articles accrue more citations, univariately and after adjusting for the other predictors (OLS and mixed-effects models)? |
 | `08_fwci` | Do sharing articles score higher on field-weighted impact? |
-| `09_citation_dynamics` | When does the advantage appear, and does it persist? |
+| `10_citation_dynamics` | When does the advantage appear, and does it persist? |
 
 `analysis/helpers/` holds only code that two or more notebooks import (`config`, `dataset`,
 `stats`, `plotting`, `r_models`). Single-notebook helpers stay inline on purpose. There is no
@@ -77,7 +77,7 @@ Results order in the revised manuscript:
 2. sharing status against the other article features (nb 05)
 3. multivariable regression on the shared-year citation count: age and venue dominate, sharing is null (nb 07; four models, see below)
 4. FWCI (nb 08)
-5. citation dynamics, year by year post-publication (nb 09)
+5. citation dynamics, year by year post-publication (nb 10)
 
 Decisions already taken, each of which needs re-arguing before it is changed:
 
@@ -90,7 +90,7 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   `log_weeks_since_pub` rather than equalizing it by construction, so the two were near functions
   of the same counts. Sweeping k, or re-running the shared-year count at an earlier cutoff, only
   discards citations; the temporal question either would gesture at is answered directly by the
-  year-by-year model in nb 09. Report the one determined cutoff; do not sweep it.
+  year-by-year model in nb 10. Report the one determined cutoff; do not sweep it.
 - **Citation dynamics stays, as a multivariable model.** The reviewer never asked for the
   year-by-year analysis to go, and it is the only thing in the paper that answers *when* an
   advantage appears, which the aggregate DVs cannot. What has to change is how it is fitted: his
@@ -125,13 +125,13 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   granularity models), since a random intercept would also condition on venue. The mixed models
   (2 and 3, in nb 07 and nb 08) are fitted by REML, which gives less biased variance components (venue
   variance, ICC, R^2) with only 23 venues; ML would only be needed to compare fixed-effects structures
-  by AIC or likelihood ratio, which these notebooks do not do (nb 09's R fits are ML, because its
+  by AIC or likelihood ratio, which these notebooks do not do (nb 10's R fits are ML, because its
   time-term comparison changes the fixed effects). Convergence, R^2 and
   venue ICC are shown for each, and the sharing effect is compared across all four (AIC/BIC are
   deliberately not used); nb 07 and nb 08 share `helpers.stats.model_diagnostics` and `sharing_effect`
   for this, and `granularity_wald_test` for the omnibus test. The granularity comparison repeats the four models on the 80 sharers only
   (baseline PARTICIPANT), with one omnibus Wald test per model.
-- **Citation dynamics is one mixed-effects model of yearly citation flow (nb 09)**, fitted in R with
+- **Citation dynamics is one mixed-effects model of yearly citation flow (nb 10)**, fitted in R with
   lme4 (`helpers.r_models.fit_glmm`): `citations ~ is_sharing_data * k + has_us_author +
   is_open_access + has_preprint + log_number_of_authors + venue_impact + factor(publication_year) +
   (1 | venue_name/article)`. Articles are nested in venues; publication year is a categorical fixed
@@ -179,7 +179,7 @@ Still open:
 - **Bayes factors are not implemented anywhere.** This is the one reviewer request the current
   plan does not touch, and it is what would let the null sharing effect be reported as evidence
   for the null rather than hedged.
-- **Citation dynamics by sharing granularity (nb 09).** The sharing vs. non-sharing model is
+- **Citation dynamics by sharing granularity (nb 10).** The sharing vs. non-sharing model is
   implemented (see "Decisions already taken"); the same model with `sharing_class * k` on the 80
   sharers is not yet. Also worth one sentence in the manuscript on why time is binned annually, since
   the reviewer's page-6 comment suggests expressing things in weeks: OpenAlex serves
@@ -208,7 +208,7 @@ rediscovered or lost. Nothing here is written yet.
   distribution families, referencing the GitHub repository. The specification range is what makes
   this defensible, so it is worth stating even though the Results report a single model.
 
-- **Why time is binned annually (nb 09).** The reviewer's page-6 comment asks whether things could
+- **Why time is binned annually (nb 10).** The reviewer's page-6 comment asks whether things could
   be expressed in weeks. OpenAlex serves `counts_by_year`, so annual is the finest resolution the
   source supports. One sentence, or the comment reads as unaddressed.
 
@@ -228,7 +228,7 @@ Use the project venv — the system Python does not have the required packages:
 Python 3.14. Dependencies in `requirements.txt`.
 
 **R** (4.5.2) is used only for the mixed models `statsmodels` cannot fit (Poisson and negative-binomial
-LMEs in nb 09, and the Gaussian one they are compared with), through `lme4`. The package library is `C:\Users\nirjo\R_library\4.5`, and `R_LIBS_USER`
+LMEs in nb 10, and the Gaussian one they are compared with), through `lme4`. The package library is `C:\Users\nirjo\R_library\4.5`, and `R_LIBS_USER`
 must point at it (`helpers.config.R_LIBRARY_DIR` does, unless the variable is already set). It holds
 `lme4` 2.0-1, `lmerTest`, `glmmTMB`, `broom.mixed`, `emmeans`, `performance` and `jsonlite`; `DHARMa` and
 `car` are **not** installed. `Rscript` is `C:\Program Files\R\R-4.5.2\bin\Rscript.exe`. Models are fitted by
@@ -256,7 +256,7 @@ python -m nbconvert --to notebook --execute --inplace --ExecutePreprocessor.time
 ```
 
 Order does not matter, since each notebook runs standalone from a cold kernel. One caveat:
-notebooks 07, 08 and 09 call `fig.show()` with the renderer set to `"browser"`, which opens a tab
+notebooks 07, 08 and 10 call `fig.show()` with the renderer set to `"browser"`, which opens a tab
 per figure. For an unattended run, put a `sitecustomize.py` that no-ops `webbrowser.open` on
 `PYTHONPATH` rather than editing the notebooks.
 
@@ -362,7 +362,7 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   one-sided t-test on `log(1 + citations)` is also null (t = 0.40, p = 0.35, d = 0.06).
 - **Age-adjusted residuals** (v1, superseded, nb 07): sharers accrue ~17.8% more citations, but only marginally
   (t(232) = 1.38, p = 0.085, d = 0.19).
-- **Citation dynamics, primary model (nb 09)**: Gaussian on `log(1 + citations)`, converged and not
+- **Citation dynamics, primary model (nb 10)**: Gaussian on `log(1 + citations)`, converged and not
   singular (venue variance 0.025, article-within-venue 0.283, residual 0.239). With linear k, the
   `is_sharing_data:k` coefficient is b = -0.0416 (SE 0.0160, p = 0.0094): sharing articles' yearly
   citations fall about 4% per year relative to non-sharing ones (`exp(b) - 1`, on `1 + citations`).
@@ -373,14 +373,14 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   slope is b = -0.093 per SD of k (SE 0.033, p = 0.0043). Predicted citations (geometric-mean scale)
   for a typical article: sharing 2.4, 2.5, 2.4 down to 1.4 and non-sharing 2.1 rising to 2.4 at
   k = 4 then falling to 2.0, over k = 1 to 8.
-- **Citation dynamics, robustness fits (nb 09)**: negative binomial beats Poisson on AIC (5574.3 vs
+- **Citation dynamics, robustness fits (nb 10)**: negative binomial beats Poisson on AIC (5574.3 vs
   5636.7; Poisson overdispersion ratio 1.05, NB theta 11.5). With linear k, the NB `is_sharing_data:k`
   rate ratio is 0.939 (95% CI 0.902 to 0.978, p = 0.0025): about 6% fewer yearly citations per year.
   Poisson gives 0.944 (p = 0.0007) and the raw-count Gaussian b = -0.21 citations/year (p = 0.0056).
   On the NB fit the shared quadratic also wins (AIC -6.5) with a sharing-by-slope of b = -0.142 per SD
   of k (rate ratio 0.87, p = 0.0009), a negative common curvature (p = 0.003) and a null sharing main
   effect at the mean k (p = 0.97). All four families agree on the sign and significance.
-- **Citation dynamics** (v1, superseded, nb 09): significant cumulative advantage in Years 1-4, marginal in 5-7,
+- **Citation dynamics** (v1, superseded, nb 10): significant cumulative advantage in Years 1-4, marginal in 5-7,
   null by Year 8. Citation *velocity* differs only in Year 1 — read as early visibility
   rather than a sustained rate difference. Attrition caveat: N = 234 at Year 1 falls to
   84 by Year 7, with only 19 sharers left.
