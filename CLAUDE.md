@@ -17,7 +17,7 @@ current in-progress revision; `brief report.pdf` is the version that was submitt
 
 ```
 data/       acquisition only - OpenAlex/CrossRef fetching, and _api_secrets.py
-analysis/   nine notebooks, one per research question, plus helpers/
+analysis/   ten notebooks, one per research question, plus helpers/
 output/     exported figures
 data_store/ source data AND the derived parquet frames (gitignored)
 ```
@@ -57,6 +57,7 @@ between notebooks.
 | `06_citation_descriptives` | What do the citation and impact outcomes look like, overall and by sharing status, before any modelling? |
 | `07_citation_counts` | Do sharing articles accrue more citations, univariately and after adjusting for the other predictors (OLS and mixed-effects models)? |
 | `08_fwci` | Do sharing articles score higher on field-weighted impact? |
+| `09_results_figures` | The manuscript figures that summarize nb 07 and nb 08 together: sharing vs. non-sharing violins and the supplementary granularity bars |
 | `10_citation_dynamics` | When does the advantage appear, and does it persist? |
 
 `analysis/helpers/` holds only code that two or more notebooks import (`config`, `dataset`,
@@ -76,7 +77,7 @@ Results order in the revised manuscript:
 1. feature descriptives and appendix figures (nb 02, with the transformation checks in nb 03)
 2. sharing status against the other article features (nb 05)
 3. multivariable regression on the shared-year citation count: age and venue dominate, sharing is null (nb 07; four models, see below)
-4. FWCI (nb 08)
+4. FWCI (nb 08), with the main figure for items 3 and 4 and the supplementary granularity figure (nb 09)
 5. citation dynamics, year by year post-publication (nb 10)
 
 Decisions already taken, each of which needs re-arguing before it is changed:
@@ -333,6 +334,10 @@ changing the text too.
   (+11 not already found) → repository search (+8) = 47 total (20.1%). A candidate is
   accepted only when title similarity is high, first *and* last author match exactly, and
   the preprint year is at or before the publication year.
+- **Figure annotations** (nb 09): the sharing coefficient is `b` (unstandardized, on the log scale), not `beta`,
+  from Model 3, written `b=0.04, p=0.77` (leading zero, deliberately not APA). Both outcomes are plotted on
+  the scale the models are fitted on, `log(1 + citations)` and `log(imputed FWCI)`, with tick labels in the
+  original units; colors come from `CLASS_COLORS`.
 - **Statistics**: alpha = 0.05. Tests of the sharing hypothesis are **one-sided**; the covariate
   comparisons in nb 05 are two-sided. Multiplicity is handled with Benjamini-Hochberg FDR.
 - **Feature matrix**: `build_feature_matrix()` also carries `Venue Name` (a string), the grouping
