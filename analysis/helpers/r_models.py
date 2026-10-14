@@ -32,8 +32,9 @@ class GlmmResult:
 
     `fixed_effects` is indexed by term with `estimate`, `se`, `statistic` and `p`; the count families
     (Poisson, NB) add `rate_ratio` and its Wald 95% CI, since `exp(b)` is the multiplicative effect.
-    `predictions`, when requested, repeats the new data with `fit`, `ci_low` and `ci_high` on the
-    response scale (fixed effects only, i.e. the population-level prediction).
+    `predictions`, when requested, repeats the new data with `fit`, the 95% CI (`ci_low`, `ci_high`) and
+    the +/- 1 SE interval (`sem_low`, `sem_high`) on the response scale (fixed effects only, i.e. the
+    population-level prediction). The intervals are symmetric on the link scale, so not on the response scale.
     """
     family: Family
     formula: str
@@ -64,6 +65,8 @@ def _parse_predictions(raw: list[dict], newdata: pd.DataFrame, family: Family) -
     out["fit"] = _to_response_scale(link["link"], family)
     out["ci_low"] = _to_response_scale(link["link"] - _Z_975 * link["link_se"], family)
     out["ci_high"] = _to_response_scale(link["link"] + _Z_975 * link["link_se"], family)
+    out["sem_low"] = _to_response_scale(link["link"] - link["link_se"], family)
+    out["sem_high"] = _to_response_scale(link["link"] + link["link_se"], family)
     return out
 
 
