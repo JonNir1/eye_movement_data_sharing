@@ -47,6 +47,12 @@ class TestFitGlmm:
         expected = np.exp(fixed["(Intercept)"] + fixed["x"] * grid["x"])
         assert np.allclose(result.predictions["fit"], expected)
         assert (result.predictions["ci_low"] < result.predictions["fit"]).all()
+        assert (result.predictions["ci_low"] < result.predictions["sem_low"]).all()
+        assert (result.predictions["sem_high"] < result.predictions["ci_high"]).all()
+        assert np.allclose(
+            np.log(result.predictions["sem_high"] / result.predictions["fit"]),
+            np.log(result.predictions["fit"] / result.predictions["sem_low"]),
+        )
 
     def test_negative_binomial_with_a_fixed_theta_reports_that_theta(self):
         result = fit_glmm(make_poisson_data(), "y ~ x + (1 | g)", "nb", factors=("g",), theta=5.0)
