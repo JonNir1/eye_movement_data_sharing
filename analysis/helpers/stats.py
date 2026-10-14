@@ -6,6 +6,8 @@ is that `BINARY_FEATURES` is imported from `helpers.config` rather than read off
 globals.
 """
 
+import itertools
+import re
 from typing import Dict, Literal, Union
 
 import numpy as np
@@ -13,6 +15,7 @@ import pandas as pd
 import pingouin as pg
 import statsmodels.api as sm
 from scipy import stats
+from statsmodels.stats.multitest import multipletests
 
 from helpers.config import BINARY_FEATURES
 
@@ -90,6 +93,42 @@ def granularity_wald_test(result, terms: list[str]) -> dict:
         restrictions[row, result.params.index.get_loc(term)] = 1
     test = result.wald_test(restrictions, scalar=True)
     return {"statistic": float(test.statistic), "p": float(test.pvalue)}
+
+
+def pairwise_contrasts(result, terms: list[str], baseline: str) -> pd.DataFrame:
+    """All pairwise contrasts between the levels of a categorical predictor in a fitted OLS or `MixedLM`
+    model: each level against the baseline (the coefficients themselves) and the non-baseline levels
+    against each other.
+
+    Each contrast is the later level minus the earlier one, in the order `[baseline, *terms]`, so
+    `exp(b)` is the ratio of the later level's geometric mean to the earlier one's for a log-scale
+    outcome. P-values are two-sided (t for OLS, z for `MixedLM`) and corrected across the contrasts by
+    Benjamini-Hochberg.
+
+    :param terms: the non-baseline dummies as they appear in `result.params`, e.g.
+        `C(sharing_class)[T.TRIAL]`.
+    :param baseline: the reference level, e.g. `PARTICIPANT`.
+    :return: one row per contrast (`TRIAL vs. PARTICIPANT`) with `b`, `SE`, `t`, `p`, `p_FDR`,
+        `ratio` and `% change`.
+    """
+    levels = [baseline] + [re.search(r"\[T\.(.+)\]$", term).group(1) for term in terms]
+    positions = [None] + [result.params.index.get_loc(term) for term in terms]
+    rows = {}
+    for earlier, later in itertools.combinations(range(len(levels)), 2):
+        weights = np.zeros((1, getattr(result, "k_fe", len(result.params))))     # MixedLM.t_test takes the fixed effects only
+        weights[0, positions[later]] = 1
+        if positions[earlier] is not None:
+            weights[0, positions[earlier]] = -1
+        test = result.t_test(weights)
+        b = float(np.squeeze(test.effect))
+        rows[f"{levels[later]} vs. {levels[earlier]}"] = {
+            "b": b, "SE": float(np.squeeze(test.sd)), "t": float(np.squeeze(test.tvalue)), "p": float(np.squeeze(test.pvalue)),
+            "ratio": np.exp(b), "% change": percent_difference(b),
+        }
+    table = pd.DataFrame(rows).T
+    table.insert(4, "p_FDR", multipletests(table["p"], method="fdr_bh")[1])
+    table.index.name = "Contrast"
+    return table
 
 
 def compare_binary(

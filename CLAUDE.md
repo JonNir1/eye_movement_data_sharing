@@ -130,8 +130,9 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   time-term comparison changes the fixed effects). Convergence, R^2 and
   venue ICC are shown for each, and the sharing effect is compared across all four (AIC/BIC are
   deliberately not used); nb 07 and nb 08 share `helpers.stats.model_diagnostics` and `sharing_effect`
-  for this, and `granularity_wald_test` for the omnibus test. The granularity comparison repeats the four models on the 80 sharers only
-  (baseline PARTICIPANT), with one omnibus Wald test per model.
+  for this, `pairwise_contrasts` for the three granularity contrasts and `granularity_wald_test` for the omnibus test. The granularity
+  comparison repeats the four models on the 80 sharers only (baseline PARTICIPANT), with the pairwise contrasts (two-sided, BH across
+  the three within each model) shown before one omnibus Wald test per model.
 - **Citation dynamics is one mixed-effects model of yearly citation flow (nb 10)**, fitted in R with
   lme4 (`helpers.r_models.fit_glmm`): `citations ~ is_sharing_data * k + has_us_author +
   is_open_access + has_preprint + log_number_of_authors + venue_impact + factor(publication_year) +
