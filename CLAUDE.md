@@ -172,18 +172,21 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   only Poisson with NB (a Gaussian density is not comparable to a count pmf, nor to a Gaussian on
   another outcome); it never picks the primary. The sharing main effect is the group difference at k = 0, the
   excluded publication year, so it is not interpreted: the sharing-by-time interaction is. Time is
-  tried as `k`, `log(k)`, `k + log(k)`, `k^2`, a quadratic `k + k^2` and two `(main only)` variants, within the
-  primary family (where the ML AIC is comparable), and the simplest is kept unless another lowers the AIC by
-  more than 2. The two `(main only)` variants have the sharing-by-time interaction with linear k but no main
-  effect of k, so their interaction coefficient is the sharing group's whole slope rather than a difference
-  in slopes; only their AIC is comparable. The non-linear term in `k + log(k)` and `k + k^2` is shared by
+  tried as `k`, `log(k)`, `k + log(k)`, `k^2` and a quadratic `k + k^2`, within the primary family (where
+  the ML AIC is comparable), and the simplest is kept unless another lowers the AIC by more than 2. Every
+  variant keeps the main effect of each term it interacts with (variants with the interaction but no main
+  effect were dropped: their coefficient is not a difference in slopes). The non-linear term in `k + log(k)` and `k + k^2` is shared by
   both groups (no sharing x log(k) or sharing x k^2 interaction; for the quadratic this was rejected on the
   NB fit, LRT p = 0.31, and not re-tested on the Gaussian), so the sharing difference stays linear in time
   and one coefficient summarizes it. The quadratic is fitted on standardized k (`k_z`, the same model as raw
-  k): raw k and k^2 are nearly collinear and lme4 does not converge on them. The model is a random
-  intercept per article and venue only (no random slope for k, no serial correlation), and cohort fixed
-  effects plus k absorb any linear calendar-year trend into the k slope; both are stated in the notebook
-  as limitations. Count fits use the bobyqa optimizer. `glmer.nb` estimates theta in an outer loop and takes
+  k): raw k and k^2 are nearly collinear and lme4 does not converge on them. After the time term is
+  chosen, a random slope for standardized k per article, `(1 | venue_name) + (1 + k_z | venue_name:article)`,
+  is compared with the random-intercept model by the same rule (AIC lower by more than 2, and converged),
+  because sharing varies between articles and k within them, so omitting the slope can understate the SE of
+  the interaction; it is kept when it wins and then drives the figure. The offset and count-family robustness
+  checks keep the random-intercept structure. Serial correlation is not modelled, and cohort fixed effects
+  plus k absorb any linear calendar-year trend into the k slope; both are stated in the notebook as
+  limitations. Count fits use the bobyqa optimizer. `glmer.nb` estimates theta in an outer loop and takes
   about two minutes per fit (the only slow fit now); `fit_glmm(theta=...)` holds it fixed, which
   reproduces the `glmer.nb` AIC to two decimals.
 - **FWCI is the declared primary endpoint**, as it was in v1. The other two citation DVs are
@@ -427,12 +430,17 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   Offset sensitivity (coefficients are on different scales, so compare |t|): `log(y + 0.5)` b = -0.051
   (|t| 2.48), `+ 0.25` b = -0.061 (2.34), `+ 0.1` b = -0.073 (2.15), zeros dropped (N = 1117) b = -0.042
   (2.10), against 2.60 for `+ 1`. Time term, within this family (AIC vs. linear k): log(k) +0.5, k^2
-  -0.1, `k + k^2` -6.3, `k^2 (main only)` -6.5, `log(k) (main only)` -3.4 and `k + log(k)` -16.2, which is
+  -0.1, `k + k^2` -6.3 and `k + log(k)` -16.2, which is
   the one used. In it the sharing-by-time slope is b = -0.047 per year (SE 0.016, p = 0.0029), against
   b = -0.042 (p = 0.0094) with linear k and b = -0.093 per SD of k (SE 0.033, p = 0.0043) in the
-  quadratic: the sign and significance do not depend on the time term. Predicted citations
-  (geometric-mean scale) for a typical article over k = 1 to 8: sharing 2.3, 2.6, 2.5, 2.4, 2.1, 1.9, 1.6,
-  1.4 and non-sharing 2.0 rising to 2.4 at k = 3 to 4 then falling to 2.0.
+  quadratic: the sign and significance do not depend on the time term. Random slope for k on top of
+  `k + log(k)` (converged, not singular; slope SD 0.14 on the k_z scale, intercept-slope correlation 0.25):
+  AIC -17.7 vs. the random intercept, so it is the model used. Its sharing-by-time slope is b = -0.045
+  per year (SE 0.020, p = 0.022), against b = -0.047 (SE 0.016, p = 0.0029) without the slope: the
+  estimate barely moves but the SE grows by about 20%, which is what omitting the slope was hiding, and the
+  effect stays significant. Predicted citations (geometric-mean scale) for a typical article over k = 1 to
+  8: sharing 2.4, 2.6, 2.6, 2.4, 2.2, 1.9, 1.6, 1.4 and non-sharing 2.0 rising to 2.5 at k = 3 then falling
+  to 1.9.
 - **Citation dynamics, robustness fits (nb 10)**: negative binomial beats Poisson on AIC (5574.3 vs
   5636.7; Poisson overdispersion ratio 1.05, NB theta 11.5). With linear k, the NB `is_sharing_data:k`
   rate ratio is 0.939 (95% CI 0.902 to 0.978, p = 0.0025): about 6% fewer yearly citations per year.
