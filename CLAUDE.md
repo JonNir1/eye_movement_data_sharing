@@ -172,13 +172,18 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   only Poisson with NB (a Gaussian density is not comparable to a count pmf, nor to a Gaussian on
   another outcome); it never picks the primary. The sharing main effect is the group difference at k = 0, the
   excluded publication year, so it is not interpreted: the sharing-by-time interaction is. Time is
-  tried as `k`, `log(k)` and a quadratic `k + k^2`, within the primary family (where the AIC is
-  comparable), and the simplest is kept unless another lowers the AIC by more than 2. The quadratic has
-  the same curvature in both groups, i.e. `is_sharing_data * k_z + I(k_z^2)` with no sharing x k^2
-  interaction (rejected on the NB fit, LRT p = 0.31, and not re-tested on the Gaussian), so the
-  sharing difference stays linear in time and one coefficient summarizes it. It is fitted on
-  standardized k (`k_z`, the same model): raw k and k^2 are nearly collinear and lme4 does not converge
-  on them. Count fits use the bobyqa optimizer. `glmer.nb` estimates theta in an outer loop and takes
+  tried as `k`, `log(k)`, `k + log(k)`, `k^2`, a quadratic `k + k^2` and two `(main only)` variants, within the
+  primary family (where the ML AIC is comparable), and the simplest is kept unless another lowers the AIC by
+  more than 2. The two `(main only)` variants have the sharing-by-time interaction with linear k but no main
+  effect of k, so their interaction coefficient is the sharing group's whole slope rather than a difference
+  in slopes; only their AIC is comparable. The non-linear term in `k + log(k)` and `k + k^2` is shared by
+  both groups (no sharing x log(k) or sharing x k^2 interaction; for the quadratic this was rejected on the
+  NB fit, LRT p = 0.31, and not re-tested on the Gaussian), so the sharing difference stays linear in time
+  and one coefficient summarizes it. The quadratic is fitted on standardized k (`k_z`, the same model as raw
+  k): raw k and k^2 are nearly collinear and lme4 does not converge on them. The model is a random
+  intercept per article and venue only (no random slope for k, no serial correlation), and cohort fixed
+  effects plus k absorb any linear calendar-year trend into the k slope; both are stated in the notebook
+  as limitations. Count fits use the bobyqa optimizer. `glmer.nb` estimates theta in an outer loop and takes
   about two minutes per fit (the only slow fit now); `fit_glmm(theta=...)` holds it fixed, which
   reproduces the `glmer.nb` AIC to two decimals.
 - **FWCI is the declared primary endpoint**, as it was in v1. The other two citation DVs are
@@ -421,16 +426,19 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   citations fall about 4% per year relative to non-sharing ones (`exp(b) - 1`, on `1 + citations`).
   Offset sensitivity (coefficients are on different scales, so compare |t|): `log(y + 0.5)` b = -0.051
   (|t| 2.48), `+ 0.25` b = -0.061 (2.34), `+ 0.1` b = -0.073 (2.15), zeros dropped (N = 1117) b = -0.042
-  (2.10), against 2.60 for `+ 1`. Time term, within this family: log(k) does not improve on k (AIC
-  +0.5), but the shared quadratic does (AIC -6.3, so it is the one used); in it the sharing-by-time
-  slope is b = -0.093 per SD of k (SE 0.033, p = 0.0043). Predicted citations (geometric-mean scale)
-  for a typical article: sharing 2.4, 2.5, 2.4 down to 1.4 and non-sharing 2.1 rising to 2.4 at
-  k = 4 then falling to 2.0, over k = 1 to 8.
+  (2.10), against 2.60 for `+ 1`. Time term, within this family (AIC vs. linear k): log(k) +0.5, k^2
+  -0.1, `k + k^2` -6.3, `k^2 (main only)` -6.5, `log(k) (main only)` -3.4 and `k + log(k)` -16.2, which is
+  the one used. In it the sharing-by-time slope is b = -0.047 per year (SE 0.016, p = 0.0029), against
+  b = -0.042 (p = 0.0094) with linear k and b = -0.093 per SD of k (SE 0.033, p = 0.0043) in the
+  quadratic: the sign and significance do not depend on the time term. Predicted citations
+  (geometric-mean scale) for a typical article over k = 1 to 8: sharing 2.3, 2.6, 2.5, 2.4, 2.1, 1.9, 1.6,
+  1.4 and non-sharing 2.0 rising to 2.4 at k = 3 to 4 then falling to 2.0.
 - **Citation dynamics, robustness fits (nb 10)**: negative binomial beats Poisson on AIC (5574.3 vs
   5636.7; Poisson overdispersion ratio 1.05, NB theta 11.5). With linear k, the NB `is_sharing_data:k`
   rate ratio is 0.939 (95% CI 0.902 to 0.978, p = 0.0025): about 6% fewer yearly citations per year.
   Poisson gives 0.944 (p = 0.0007) and the raw-count Gaussian b = -0.21 citations/year (p = 0.0056).
-  On the NB fit the shared quadratic also wins (AIC -6.5) with a sharing-by-slope of b = -0.142 per SD
+  On the NB fit (an earlier run; the notebook now compares time terms on the primary family only) the
+  shared quadratic also won (AIC -6.5) with a sharing-by-slope of b = -0.142 per SD
   of k (rate ratio 0.87, p = 0.0009), a negative common curvature (p = 0.003) and a null sharing main
   effect at the mean k (p = 0.97). All four families agree on the sign and significance.
 - **Citation dynamics** (v1, superseded, nb 10): significant cumulative advantage in Years 1-4, marginal in 5-7,
