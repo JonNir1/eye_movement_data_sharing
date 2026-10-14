@@ -132,6 +132,27 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   deliberately not used); nb 07 and nb 08 share `helpers.stats.model_diagnostics` and `sharing_effect`
   for this, and `granularity_wald_test` for the omnibus test. The granularity comparison repeats the four models on the 80 sharers only
   (baseline PARTICIPANT), with one omnibus Wald test per model.
+
+  **The granularity analyses report Model 1, not Model 3.** The 80 sharers span 20 venues of which 9
+  contribute a single article, which is too thin to estimate between-venue variance: a singleton
+  venue carries no information toward separating venue variance from residual. The fit shows it,
+  with the venue variance collapsing to 0.0002 against a residual of 1.03 for FWCI (statsmodels
+  flags the MLE as on the boundary) and reaching only ICC 0.026 for citations. Calling that a
+  mixed-effects model overstates what was fitted. One rule for both notebooks, so the two
+  granularity analyses match each other; it does break the match with the main analyses, which
+  report Model 3, so the Methods or the table note needs a sentence saying why. Nothing hinges on
+  it: the omnibus is null under either specification, differing in the third decimal.
+
+  **All three pairwise contrasts are examined, and the omnibus is what gets reported.** With
+  PARTICIPANT as baseline the model gives only FIXATION and TRIAL against it, which hides the
+  largest gap: for FWCI, TRIAL sits essentially on PARTICIPANT (0.98x) while FIXATION - TRIAL is
+  1.64x (p = 0.097), the biggest of the three and still null after FDR (0.186). For citations all
+  three are flat (1.18x to 1.40x, p = 0.19 to 0.52). Report the omnibus in the main text and state
+  that all three pairwise contrasts were examined with none significant, so the search is visible
+  and the reader is not left asking why only two of three appeared; the contrast table itself goes
+  to Supplementary S6 with its FDR column. Chasing pairwise contrasts after a null omnibus is
+  unprotected testing, and a lone p = 0.097 reported as noteworthy is exactly what the reviewer
+  objected to.
 - **Citation dynamics is one mixed-effects model of yearly citation flow (nb 10)**, fitted in R with
   lme4 (`helpers.r_models.fit_glmm`): `citations ~ is_sharing_data * k + has_us_author +
   is_open_access + has_preprint + log_number_of_authors + venue_impact + factor(publication_year) +
@@ -203,6 +224,30 @@ rediscovered or lost. Nothing here is written yet.
   sharing through their data policies, making venue a confounder, or sharing *leads to* publication
   in higher-impact venues, making it a mediator. The 0% to 82% spread in venue sharing rates favours
   the policy reading, but it is suggestive, not decisive. Say that the conclusion holds either way.
+
+- **Each group against the field average, which only FWCI supports.** `log(FWCI) = 0` is exactly the
+  field average, and nb 08 uses plain `log`, not `log1p`, so that reference survives the transform.
+  It is the one absolute benchmark in the paper, and the contrast between groups throws it away.
+  Unadjusted, non-sharers sit *below* field average at a geometric mean of 0.827 (95% CI 0.703 to
+  0.973, p = 0.022) and sharers sit *at* it, 1.047 (0.825 to 1.330, p = 0.70). Adjusted (Model 3
+  marginal means at covariate means) neither differs from 1: 0.870 (p = 0.22) and 0.930 (p = 0.61).
+  That asymmetry is the same story the rest of the paper tells, with the apparent FWCI advantage
+  being covariate structure rather than sharing.
+
+  Two caveats, both of which have to be stated if this is used. The five imputed FWCI zeros sit at
+  log -2.3 to -3.0 against a median log-FWCI of exactly 0, so each is worth about three articles'
+  deviation, and they pull a test against a fixed reference in a way they do not pull a
+  between-group contrast, where they partly cancel: dropping them moves non-sharers from 0.827 to
+  0.869 and p from 0.022 to 0.077. And "field average" is OpenAlex's field assignment, which is
+  coarse, so sitting below it may reflect which journals the corpus samples. It is a descriptive
+  fact about this corpus, not an inference about sharing, and should be worded that way.
+
+  By granularity nothing differs from 1, before or after adjustment (unadjusted 1.128 / 0.753 /
+  1.308 for participant / trial / fixation, adjusted 0.875 / 0.862 / 1.409, nothing surviving FDR,
+  fixation closest at p = 0.077 adjusted). Trial's apparent dip is largely its two imputed zeros:
+  excluding them moves it from 0.753 to 0.915. At N = 23 to 31 the intervals span roughly 0.5 to 2.0
+  on the FWCI scale, so the honest statement is that the data cannot locate any class relative to
+  the field, not that the classes match it.
 
 - **Robustness, with a pointer to the code.** One sentence that the findings hold across model
   specifications (with and without venue, as fixed effect, as random intercept, or both) and across
