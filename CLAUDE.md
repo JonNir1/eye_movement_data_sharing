@@ -193,7 +193,9 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   share of candidates with a significant interaction of the winner's sign (a consistency check, not
   independent evidence, since they share the data, and the winner's p ignores that it was picked from four),
   the winner's b, SE, 95% CI and p, a likelihood-ratio test of the interaction against the same model
-  without it, and the per-year reading when the interaction is on linear k (`b / SD(k)`).
+  without it, and the per-year reading when the interaction is on linear k (`b / SD(k)`). `k + log(k)` and
+  `k + k^2` nest linear k, so the shared term each adds is also tested directly with a likelihood-ratio test
+  (judged on fit alone, not on the sharing coefficient).
 
   **Robustness #1 (outcome).** The winner is refitted with `log(y + c)` for c = 0.5, 0.25, 0.1 and with the
   zeros dropped (coefficients are on different scales, so compare |t|; dropping the zeros also changes the
@@ -444,7 +446,8 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   (t(232) = 1.38, p = 0.085, d = 0.19).
 - **Citation dynamics, main analysis (nb 10)**: Gaussian on `log(1 + citations)`, all four candidates
   converged with the full random structure, none singular. AIC: `k + log(k)` 2378.2 (Akaike weight 0.99),
-  `k + k^2` +10.7, `log(k)` +15.3, `k` +20.3: a clear winner, no near-ties. With random intercepts only the
+  `k + k^2` +10.7, `log(k)` +15.3, `k` +20.3: a clear winner, no near-ties. Likelihood-ratio tests of the shared term against linear `k`:
+  `log_k_z` chi2 = 22.3 (p = 2e-6), `k_z^2` chi2 = 11.5 (p = 0.0007). With random intercepts only the
   AICs are 2395.9, 2405.9, 2412.7 and 2412.1 (the slope helps by 13.7 to 19.2 AIC). Winner `k + log(k)`
   (venue variance 0.024, article intercept 0.287, article slope on k_z 0.020 with intercept-slope correlation
   0.25, residual 0.215): the `is_sharing_data:k_z` coefficient is b = -0.092 per SD of k (SE 0.040, 95% CI
