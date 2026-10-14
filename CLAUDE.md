@@ -155,44 +155,59 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   unprotected testing, and a lone p = 0.097 reported as noteworthy is exactly what the reviewer
   objected to.
 - **Citation dynamics is one mixed-effects model of yearly citation flow (nb 10)**, fitted in R with
-  lme4 (`helpers.r_models.fit_glmm`): `citations ~ is_sharing_data * k + has_us_author +
-  is_open_access + has_preprint + log_number_of_authors + venue_impact + factor(publication_year) +
-  (1 | venue_name/article)`. Articles are nested in venues; publication year is a categorical fixed
-  effect, and `log_weeks_since_pub` is left out because cohort and k already carry age. Four fits go
-  through the same R bridge: **the primary is a Gaussian on `log(1 + citations)`, chosen a priori and
-  not by AIC**, with the raw-count Gaussian, Poisson and negative binomial as reference and robustness
-  fits. Thelwall & Wilson (2014) recommend adding one, taking the log and using the general linear
-  model for citation data, and their simulations cover this regime (the yearly flow fits a discrete
-  lognormal, mu = 0.63, sigma = 1.19): there `log(x + 1)` keeps the nominal 5% false-positive rate and
-  is the most powerful trustworthy option, while negative binomial regression falsely flags factors
-  about 3x too often at log-SD 1 and about half the time at log-SD 2, worsening with sample size, so
-  its conclusions cannot be trusted. The discrete lognormal they prefer has no mixed-model
-  implementation, so `log(1 + y)` is the stand-in. The `+ 1` is not driving the result (the notebook's
-  offset-sensitivity table: dropping the zeros gives b = -0.042, the same as with `+ 1`). AIC compares
-  only Poisson with NB (a Gaussian density is not comparable to a count pmf, nor to a Gaussian on
-  another outcome); it never picks the primary. The sharing main effect is the group difference at k = 0, the
-  excluded publication year, so it is not interpreted: the sharing-by-time interaction is. Time is
-  tried as `k`, `log(k)`, `k + log(k)`, `k^2` and a quadratic `k + k^2`, within the primary family (where
-  the ML AIC is comparable), and the simplest is kept unless another lowers the AIC by more than 2. Every
-  variant keeps the main effect of each term it interacts with (variants with the interaction but no main
-  effect were dropped: their coefficient is not a difference in slopes). The last year, k = 9, has only
-  10 article-years (8 non-sharing, 2 sharing: the 2016 cohort); it is kept in the fit and in the figure
-  (the figure has no minimum-n cutoff, its n labels show how thin the tail is), since the reviewer asked not
-  to trim the sample, and a sensitivity refit without it leaves the slope unchanged. The non-linear term in
-  `k + log(k)` and `k + k^2` is shared by
-  both groups (no sharing x log(k) or sharing x k^2 interaction; for the quadratic this was rejected on the
-  NB fit, LRT p = 0.31, and not re-tested on the Gaussian), so the sharing difference stays linear in time
-  and one coefficient summarizes it. The quadratic is fitted on standardized k (`k_z`, the same model as raw
-  k): raw k and k^2 are nearly collinear and lme4 does not converge on them. After the time term is
-  chosen, a random slope for standardized k per article, `(1 | venue_name) + (1 + k_z | venue_name:article)`,
-  is compared with the random-intercept model by the same rule (AIC lower by more than 2, and converged),
-  because sharing varies between articles and k within them, so omitting the slope can understate the SE of
-  the interaction; it is kept when it wins and then drives the figure. The offset and count-family robustness
-  checks keep the random-intercept structure. Serial correlation is not modelled, and cohort fixed effects
-  plus k absorb any linear calendar-year trend into the k slope; both are stated in the notebook as
-  limitations. Count fits use the bobyqa optimizer. `glmer.nb` estimates theta in an outer loop and takes
-  about two minutes per fit (the only slow fit now); `fit_glmm(theta=...)` holds it fixed, which
-  reproduces the `glmer.nb` AIC to two decimals.
+  lme4 (`helpers.r_models.fit_glmm`) and organized as a story: choose g(k) under the maximal structure,
+  interpret it, stress the outcome, stress the family, then plot. The model is `citations ~ is_sharing_data *
+  <time> + has_us_author + is_open_access + has_preprint + log_number_of_authors + venue_impact +
+  factor(publication_year) + <random effects>`. Publication year is a categorical fixed effect, and
+  `log_weeks_since_pub` is left out because cohort and k already carry age.
+
+  **The primary family is a Gaussian on `log(1 + citations)`, chosen a priori and not by AIC.** Thelwall &
+  Wilson (2014) recommend adding one, taking the log and using the general linear model for citation data,
+  and their simulations cover this regime (the yearly flow fits a discrete lognormal, mu = 0.63, sigma =
+  1.19): there `log(x + 1)` keeps the nominal 5% false-positive rate and is the most powerful trustworthy
+  option, while negative binomial regression falsely flags factors about 3x too often at log-SD 1 and about
+  half the time at log-SD 2, worsening with sample size, so its conclusions cannot be trusted. The discrete
+  lognormal they prefer has no mixed-model implementation, so `log(1 + y)` is the stand-in. The raw-count
+  Gaussian, Poisson and negative binomial are robustness fits. AIC is never used to pick the family (a
+  Gaussian density is not comparable to a count pmf, nor to a Gaussian on another outcome); it only compares
+  Poisson with NB, and the time terms within the primary family.
+
+  **Time and random structure.** Both `k` and `log(k)` are always standardized (`k_z`, `log_k_z`), so the
+  sharing-by-time coefficient is per SD of the (log) time term and the sharing main effect is the group gap at
+  the mean time, not the dynamics (the interaction is the test). Four candidates g(k): sharing x `k_z`;
+  sharing x `log_k_z`; sharing x `k_z` + a shared `log_k_z`; sharing x `k_z` + a shared `k_z^2`. In the last
+  two the curvature is common to both groups (no sharing x log(k) or x k^2 interaction), so the sharing
+  difference stays linear in time and one coefficient summarizes it. `k^2` alone is dropped (its shape is
+  symmetric around the centring point), and so are variants with the interaction but no main effect (their
+  coefficient is not a difference in slopes). Each candidate starts from the maximal random structure,
+  `(1 | venue_name) + (1 + <t> | venue_name:article)` with `<t>` the time term the sharing effect interacts
+  with (`log_k_z` for the log(k) candidate, `k_z` otherwise), because sharing varies between articles and k
+  within them, so omitting the slope understates the SE of the interaction. If it fails (not converged, or
+  a singular fit) the model is refitted with `(1 | venue_name/article)`. The structure used is shown in every
+  table, and every candidate is also fitted with random intercepts only as a like-for-like reference (and to
+  show how much the slope matters).
+
+  **Selection and interpretation.** ML AIC (comparable across different fixed effects). The lowest AIC wins;
+  candidates within 2 AIC of it are reported as near-ties (with Akaike weights) and the first one is carried
+  into the family robustness check. This replaces the earlier "simplest unless better by 2" rule. Then: the
+  share of candidates with a significant interaction of the winner's sign (a consistency check, not
+  independent evidence, since they share the data, and the winner's p ignores that it was picked from four),
+  the winner's b, SE, 95% CI and p, a likelihood-ratio test of the interaction against the same model
+  without it, and the per-year reading when the interaction is on linear k (`b / SD(k)`).
+
+  **Robustness #1 (outcome).** The winner is refitted with `log(y + c)` for c = 0.5, 0.25, 0.1 and with the
+  zeros dropped (coefficients are on different scales, so compare |t|; dropping the zeros also changes the
+  estimand, conditioning on being cited), and without the last year. That year, k = 9, has only 10
+  article-years (8 non-sharing, 2 sharing: the 2016 cohort); it is kept in the fit and in the figure (the
+  figure has no minimum-n cutoff, its n labels show how thin the tail is), since the reviewer asked not to
+  trim the sample. **Robustness #2 (family).** The winner (and a near-tied g(k), if any) as a raw Gaussian,
+  Poisson and NB, each with the same fallback. `glmer.nb` estimates theta once, for the winner with random
+  intercepts (about three minutes, the only slow fit), and `fit_glmm(theta=...)` holds it fixed for the
+  others, which reproduces the `glmer.nb` AIC to two decimals. AIC is compared only between Poisson and NB
+  with the same g(k) and the same random structure. Count fits use the bobyqa optimizer.
+
+  Limits stated in the notebook: serial correlation within an article is not modelled, and cohort fixed
+  effects plus k absorb any linear calendar-year trend into the k slope.
 - **FWCI is the declared primary endpoint**, as it was in v1. The other two citation DVs are
   secondary operationalizations. No multiplicity correction across the three: they are near
   functions of the same counts, so the effective number of tests is close to one. BH still
@@ -427,32 +442,31 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   one-sided t-test on `log(1 + citations)` is also null (t = 0.40, p = 0.35, d = 0.06).
 - **Age-adjusted residuals** (v1, superseded, nb 07): sharers accrue ~17.8% more citations, but only marginally
   (t(232) = 1.38, p = 0.085, d = 0.19).
-- **Citation dynamics, primary model (nb 10)**: Gaussian on `log(1 + citations)`, converged and not
-  singular (venue variance 0.025, article-within-venue 0.283, residual 0.239). With linear k, the
-  `is_sharing_data:k` coefficient is b = -0.0416 (SE 0.0160, p = 0.0094): sharing articles' yearly
-  citations fall about 4% per year relative to non-sharing ones (`exp(b) - 1`, on `1 + citations`).
-  Offset sensitivity (coefficients are on different scales, so compare |t|): `log(y + 0.5)` b = -0.051
-  (|t| 2.48), `+ 0.25` b = -0.061 (2.34), `+ 0.1` b = -0.073 (2.15), zeros dropped (N = 1117) b = -0.042
-  (2.10), against 2.60 for `+ 1`. Time term, within this family (AIC vs. linear k): log(k) +0.5, k^2
-  -0.1, `k + k^2` -6.3 and `k + log(k)` -16.2, which is
-  the one used. In it the sharing-by-time slope is b = -0.047 per year (SE 0.016, p = 0.0029), against
-  b = -0.042 (p = 0.0094) with linear k and b = -0.093 per SD of k (SE 0.033, p = 0.0043) in the
-  quadratic: the sign and significance do not depend on the time term. Random slope for k on top of
-  `k + log(k)` (converged, not singular; slope SD 0.14 on the k_z scale, intercept-slope correlation 0.25):
-  AIC -17.7 vs. the random intercept, so it is the model used. Its sharing-by-time slope is b = -0.045
-  per year (SE 0.020, p = 0.022), against b = -0.047 (SE 0.016, p = 0.0029) without the slope: the
-  estimate barely moves but the SE grows by about 20%, which is what omitting the slope was hiding, and the
-  effect stays significant. Dropping k = 9 gives b = -0.047 (SE 0.020, p = 0.018), against -0.045 (p = 0.022)
-  with it. Predicted citations (geometric-mean scale) for a typical article over k = 1 to 9: sharing 2.4,
-  2.6, 2.6, 2.4, 2.2, 1.9, 1.6, 1.4, 1.1 and non-sharing 2.0 rising to 2.5 at k = 3 then falling to 1.7.
-- **Citation dynamics, robustness fits (nb 10)**: negative binomial beats Poisson on AIC (5574.3 vs
-  5636.7; Poisson overdispersion ratio 1.05, NB theta 11.5). With linear k, the NB `is_sharing_data:k`
-  rate ratio is 0.939 (95% CI 0.902 to 0.978, p = 0.0025): about 6% fewer yearly citations per year.
-  Poisson gives 0.944 (p = 0.0007) and the raw-count Gaussian b = -0.21 citations/year (p = 0.0056).
-  On the NB fit (an earlier run; the notebook now compares time terms on the primary family only) the
-  shared quadratic also won (AIC -6.5) with a sharing-by-slope of b = -0.142 per SD
-  of k (rate ratio 0.87, p = 0.0009), a negative common curvature (p = 0.003) and a null sharing main
-  effect at the mean k (p = 0.97). All four families agree on the sign and significance.
+- **Citation dynamics, main analysis (nb 10)**: Gaussian on `log(1 + citations)`, all four candidates
+  converged with the full random structure, none singular. AIC: `k + log(k)` 2378.2 (Akaike weight 0.99),
+  `k + k^2` +10.7, `log(k)` +15.3, `k` +20.3: a clear winner, no near-ties. With random intercepts only the
+  AICs are 2395.9, 2405.9, 2412.7 and 2412.1 (the slope helps by 13.7 to 19.2 AIC). Winner `k + log(k)`
+  (venue variance 0.024, article intercept 0.287, article slope on k_z 0.020 with intercept-slope correlation
+  0.25, residual 0.215): the `is_sharing_data:k_z` coefficient is b = -0.092 per SD of k (SE 0.040, 95% CI
+  -0.169 to -0.014, p = 0.0217; likelihood-ratio test chi2 = 5.22, p = 0.022), which is b = -0.045 per year
+  (SD of k = 2.03) or about -4.4% per year in the yearly citations of `1 + citations`. Agreement across the
+  candidates: all four negative, 3 of 4 significant (`k + k^2` p = 0.028, `log(k)` p = 0.034, linear `k`
+  b = -0.077 per SD, p = 0.051). With random intercepts only all four are significant (p = 0.003 to 0.009)
+  and the SE is about 20% smaller (0.032 vs. 0.040), which is what the slope corrects. **The effect sits at
+  the edge of significance across specifications (p about 0.02 to 0.05), so the manuscript must not
+  present it as robust or noteworthy beyond that.** Predicted citations (geometric-mean scale) for a typical
+  article over k = 1 to 9: sharing 2.4, 2.6, 2.6, 2.4, 2.2, 1.9, 1.6, 1.4, 1.1 and non-sharing 2.0 rising to
+  2.5 at k = 3 then falling to 1.7.
+- **Citation dynamics, robustness (nb 10)**: same sign everywhere. Offsets (|t|, against 2.32 for `+ 1`):
+  `log(y + 0.5)` b = -0.114 (2.24, p = 0.026), `+ 0.25` b = -0.135 (2.14, p = 0.034), `+ 0.1` b = -0.162
+  (2.00, p = 0.047), zeros dropped (N = 1117) b = -0.096 (1.96, p = 0.0516, not significant): 4 of 5 keep
+  significance. Without k = 9: b = -0.096 per SD (p = 0.018), the same as with it. Families (winner, with
+  full random structure): raw-count Gaussian b = -0.41 citations per SD (SE 0.21, p = 0.0502, not
+  significant), Poisson rate ratio 0.870 per SD (p = 0.025, AIC 5515.9), NB with theta fixed at its
+  random-intercept estimate 0.870 (p = 0.019, AIC 5523.4): 2 of 3 significant. The Poisson overdispersion
+  ratio is 0.76 once the article slopes are in (it was 1.05 with random intercepts, where NB beat Poisson
+  on AIC, 5574.3 vs. 5636.7), so NB adds nothing here and Poisson has the lower AIC by 7.6; theta is held
+  at the random-intercept value, which is an approximation for the full-structure NB.
 - **Citation dynamics** (v1, superseded, nb 10): significant cumulative advantage in Years 1-4, marginal in 5-7,
   null by Year 8. Citation *velocity* differs only in Year 1 — read as early visibility
   rather than a sustained rate difference. Attrition caveat: N = 234 at Year 1 falls to
