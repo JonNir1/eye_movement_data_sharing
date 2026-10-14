@@ -11,11 +11,12 @@ import numpy as np
 import pandas as pd
 import pytest
 import statsmodels.formula.api as smf
+from statsmodels.stats.multitest import multipletests
 
 from helpers.config import SHARING_CLASS_ORDER
 from helpers.stats import (
     _calculate_group_stats, compare_binary, compare_continuous, granularity_wald_test, model_diagnostics,
-    percent_difference, sharing_effect, significance_class,
+    pairwise_contrasts, percent_difference, sharing_effect, significance_class,
 )
 
 SHARE_COL = "Is Sharing Data"
@@ -381,3 +382,45 @@ class TestGranularityWaldTest:
         for fit in (clustered, mixed):
             result = granularity_wald_test(fit, self.TERMS)
             assert 0 <= result["p"] <= 1 and result["statistic"] > 0
+
+
+class TestPairwiseContrasts:
+    TERMS = TestGranularityWaldTest.TERMS
+
+    @staticmethod
+    def _fits(effects: dict) -> dict:
+        data = TestGranularityWaldTest._make_data(effects)
+        clustered = smf.ols("y ~ C(sharing_class)", data).fit(
+            cov_type="cluster", cov_kwds={"groups": pd.factorize(data["venue_name"])[0]}, use_t=True)
+        return {
+            "ols": smf.ols("y ~ C(sharing_class)", data).fit(), "clustered": clustered,
+            "mixed": smf.mixedlm("y ~ C(sharing_class)", data, groups=data["venue_name"]).fit(reml=True),
+        }
+
+    def test_rows_are_every_pair_with_the_later_level_minus_the_earlier(self):
+        fit = self._fits({"PARTICIPANT": 0.0, "TRIAL": 0.3, "FIXATION": 0.6})["ols"]
+        table = pairwise_contrasts(fit, self.TERMS, "PARTICIPANT")
+        assert list(table.index) == ["TRIAL vs. PARTICIPANT", "FIXATION vs. PARTICIPANT", "FIXATION vs. TRIAL"]
+        assert list(table.columns) == ["b", "SE", "t", "p", "p_FDR", "ratio", "% change"]
+
+    def test_estimates_follow_from_the_coefficients(self):
+        for fit in self._fits({"PARTICIPANT": 0.0, "TRIAL": 0.3, "FIXATION": 0.6}).values():
+            table = pairwise_contrasts(fit, self.TERMS, "PARTICIPANT")
+            trial, fixation = (fit.params[term] for term in self.TERMS)
+            assert table.loc["TRIAL vs. PARTICIPANT", "b"] == pytest.approx(trial)
+            assert table.loc["FIXATION vs. PARTICIPANT", "b"] == pytest.approx(fixation)
+            assert table.loc["FIXATION vs. TRIAL", "b"] == pytest.approx(fixation - trial)
+            assert table["ratio"].to_numpy() == pytest.approx(np.exp(table["b"].to_numpy()))
+            assert table["% change"].to_numpy() == pytest.approx(100 * (np.exp(table["b"].to_numpy()) - 1))
+
+    def test_a_coefficient_contrast_matches_the_models_own_test(self):
+        for fit in self._fits({"PARTICIPANT": 0.0, "TRIAL": 0.3, "FIXATION": 0.6}).values():
+            table = pairwise_contrasts(fit, self.TERMS, "PARTICIPANT")
+            assert table.loc["TRIAL vs. PARTICIPANT", "SE"] == pytest.approx(fit.bse[self.TERMS[0]])
+            assert table.loc["TRIAL vs. PARTICIPANT", "p"] == pytest.approx(fit.pvalues[self.TERMS[0]])
+
+    def test_fdr_correction_is_benjamini_hochberg_across_the_contrasts(self):
+        fit = self._fits({"PARTICIPANT": 0.0, "TRIAL": 0.5, "FIXATION": 1.0})["ols"]
+        table = pairwise_contrasts(fit, self.TERMS, "PARTICIPANT")
+        assert table["p_FDR"].to_numpy() == pytest.approx(multipletests(table["p"], method="fdr_bh")[1])
+        assert (table["p_FDR"] >= table["p"]).all() and (table["p_FDR"] <= 1).all()

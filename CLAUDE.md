@@ -130,8 +130,9 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   time-term comparison changes the fixed effects). Convergence, R^2 and
   venue ICC are shown for each, and the sharing effect is compared across all four (AIC/BIC are
   deliberately not used); nb 07 and nb 08 share `helpers.stats.model_diagnostics` and `sharing_effect`
-  for this, and `granularity_wald_test` for the omnibus test. The granularity comparison repeats the four models on the 80 sharers only
-  (baseline PARTICIPANT), with one omnibus Wald test per model.
+  for this, `pairwise_contrasts` for the three granularity contrasts and `granularity_wald_test` for the omnibus test. The granularity
+  comparison repeats the four models on the 80 sharers only (baseline PARTICIPANT), with the pairwise contrasts (two-sided, BH across
+  the three within each model) shown before one omnibus Wald test per model.
 
   **The granularity analyses report Model 1, not Model 3.** The 80 sharers span 20 venues of which 9
   contribute a single article, which is too thin to estimate between-venue variance: a singleton
