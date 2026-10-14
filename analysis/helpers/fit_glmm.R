@@ -54,7 +54,9 @@ fixed_effects <- function(fit) {
 
 variance_components <- function(fit) {
   components <- as.data.frame(VarCorr(fit))
-  data.frame(group = components$grp, term = components$var1, variance = components$vcov, sd = components$sdcor)
+  data.frame(
+    group = components$grp, term = components$var1, term2 = components$var2, variance = components$vcov, sd = components$sdcor
+  )
 }
 
 predictions <- function(fit, newdata) {
