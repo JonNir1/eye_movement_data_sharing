@@ -337,7 +337,9 @@ changing the text too.
 - **Figure annotations** (nb 09): the sharing coefficient is `b` (unstandardized, on the log scale), not `beta`,
   from Model 3, written `b=0.04, p=0.77` (leading zero, deliberately not APA). Both outcomes are plotted on
   the scale the models are fitted on, `log(1 + citations)` and `log(imputed FWCI)`, with tick labels in the
-  original units; colors come from `CLASS_COLORS`.
+  original units; colors come from `CLASS_COLORS`. The one exception is the supplementary granularity
+  figure, whose bars show raw means +/- SEM (citations through 2025, and FWCI with a line at 1, the field
+  average): its caption has to say the omnibus tests were fitted on the log scale.
 - **Statistics**: alpha = 0.05. Tests of the sharing hypothesis are **one-sided**; the covariate
   comparisons in nb 05 are two-sided. Multiplicity is handled with Benjamini-Hochberg FDR.
 - **Feature matrix**: `build_feature_matrix()` also carries `Venue Name` (a string), the grouping
