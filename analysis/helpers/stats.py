@@ -92,7 +92,14 @@ def granularity_wald_test(result, terms: list[str]) -> dict:
     for row, term in enumerate(terms):
         restrictions[row, result.params.index.get_loc(term)] = 1
     test = result.wald_test(restrictions, scalar=True)
-    return {"statistic": float(test.statistic), "p": float(test.pvalue)}
+    return {
+        "test": "F" if isinstance(result.model, sm.OLS) else "chi2",
+        "statistic": float(test.statistic),
+        "p": float(test.pvalue),
+        "df_denom": int(test.df_denom) if hasattr(test, "df_denom") else None,
+        "df_num": int(test.df_num) if hasattr(test, "df_num") else None,
+
+    }
 
 
 def pairwise_contrasts(result, terms: list[str], baseline: str) -> pd.DataFrame:
