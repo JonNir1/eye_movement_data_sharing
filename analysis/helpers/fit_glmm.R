@@ -82,8 +82,9 @@ fit <- withCallingHandlers(
 convergence_problems <- unlist(fit@optinfo$conv$lme4$messages)
 messages <- unique(c(messages, convergence_problems))
 
-# Nakagawa's marginal (fixed effects) and conditional (fixed + random effects) R^2, with random slopes handled by `performance`;
-# approximate for the count families. NA when `performance` is missing or cannot compute it
+# Nakagawa's marginal (fixed effects) and conditional (fixed + random effects) R^2, with random slopes handled by `performance`.
+# NA when `performance` is missing or cannot compute it, and always for the count families: their R^2 rests on a distribution-specific
+# variance that is only an approximation, and it returned a conditional R^2 of 1 for a negative binomial with a fixed theta
 nakagawa_r2 <- function(fit) {
   r2 <- tryCatch(suppressMessages(suppressWarnings(performance::r2_nakagawa(fit))), error = function(e) NULL)
   if (is.null(r2)) return(list(marginal = NA, conditional = NA))
@@ -91,7 +92,7 @@ nakagawa_r2 <- function(fit) {
 }
 
 is_count <- job$family != "gaussian"
-r2 <- nakagawa_r2(fit)
+r2 <- if (is_count) list(marginal = NA, conditional = NA) else nakagawa_r2(fit)
 result <- list(
   fit = list(
     n_obs = nobs(fit),

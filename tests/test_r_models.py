@@ -83,7 +83,7 @@ class TestNakagawaR2:
         marginal, conditional = result.fit["r2_marginal"], result.fit["r2_conditional"]
         assert 0 < marginal < conditional < 1
 
-    def test_count_fits_report_the_r2_keys(self):
+    def test_count_fits_have_no_r2(self):
         result = fit_glmm(make_poisson_data(), "y ~ x + (1 | g)", "poisson", factors=("g",))
-        assert "r2_marginal" in result.fit and "r2_conditional" in result.fit
+        assert np.isnan(result.fit["r2_marginal"]) and np.isnan(result.fit["r2_conditional"])
         assert result.fit["bic"] > result.fit["aic"]            # N is above e^2, so the BIC penalty is the larger
