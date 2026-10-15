@@ -199,7 +199,9 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   (judged on fit alone, not on the sharing coefficient). The winner is also compared with the same model
   without the interaction by likelihood-ratio test, AIC and BIC with their weights (they can disagree for a
   modest effect: with one added term AIC accepts it at chi2 > 2, BIC at chi2 > log N), and every model table
-  carries Nakagawa's marginal and conditional R2 (`fit_glmm` returns them, and the BIC, in its metadata).
+  carries Nakagawa's marginal and conditional R2 (`fit_glmm` returns them, and the BIC, in its metadata; the
+  R2 is NA for the count families, where it is only an approximation and gave a conditional R2 of 1 for the
+  negative binomial).
 
   **Robustness #1 (outcome).** The winner is refitted with `log(y + c)` for c = 0.5, 0.25, 0.1 and with the
   zeros dropped (coefficients are on different scales, so compare |t|; dropping the zeros also changes the
