@@ -158,8 +158,9 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   lme4 (`helpers.r_models.fit_glmm`) and organized as a story: choose g(k) under the maximal structure,
   interpret it, stress the outcome, stress the family, then plot. The model is `citations ~ is_sharing_data *
   <time> + has_us_author + is_open_access + has_preprint + log_number_of_authors + venue_impact +
-  factor(publication_year) + <random effects>`. Publication year is a categorical fixed effect, and
-  `log_weeks_since_pub` is left out because cohort and k already carry age.
+  log_weeks_since_pub + <random effects>`. Article age is `log_weeks_since_pub`, as in the other models of
+  the article. In the yearly data it is fixed per article (the age at the snapshot, correlating -0.97 with
+  the publication year, so it is essentially the cohort), and `k` carries the age of each observation.
 
   **The primary family is a Gaussian on `log(1 + citations)`, chosen a priori and not by AIC.** Thelwall &
   Wilson (2014) recommend adding one, taking the log and using the general linear model for citation data,
@@ -208,8 +209,12 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   others, which reproduces the `glmer.nb` AIC to two decimals. AIC is compared only between Poisson and NB
   with the same g(k) and the same random structure. Count fits use the bobyqa optimizer.
 
-  Limits stated in the notebook: serial correlation within an article is not modelled, and cohort fixed
-  effects plus k absorb any linear calendar-year trend into the k slope.
+  **Robustness #3 (age adjustment).** The winner refitted with a categorical publication year in place of
+  `log_weeks_since_pub`, and with no age-related predictor: the sharing-by-time coefficient is the same, and
+  AIC does not need an age term (see the invariants).
+
+  Limits stated in the notebook: serial correlation within an article is not modelled, and the age term
+  (cohort) plus k absorb any linear calendar-year trend into the k slope.
 - **FWCI is the declared primary endpoint**, as it was in v1. The other two citation DVs are
   secondary operationalizations. No multiplicity correction across the three: they are near
   functions of the same counts, so the effective number of tests is close to one. BH still
@@ -445,31 +450,37 @@ If a refactor moves any of these, it is a regression until proven otherwise.
 - **Age-adjusted residuals** (v1, superseded, nb 07): sharers accrue ~17.8% more citations, but only marginally
   (t(232) = 1.38, p = 0.085, d = 0.19).
 - **Citation dynamics, main analysis (nb 10)**: Gaussian on `log(1 + citations)`, all four candidates
-  converged with the full random structure, none singular. AIC: `k + log(k)` 2378.2 (Akaike weight 0.99),
-  `k + k^2` +10.7, `log(k)` +15.3, `k` +20.3: a clear winner, no near-ties. Likelihood-ratio tests of the shared term against linear `k`:
-  `log_k_z` chi2 = 22.3 (p = 2e-6), `k_z^2` chi2 = 11.5 (p = 0.0007). With random intercepts only the
-  AICs are 2395.9, 2405.9, 2412.7 and 2412.1 (the slope helps by 13.7 to 19.2 AIC). Winner `k + log(k)`
-  (venue variance 0.024, article intercept 0.287, article slope on k_z 0.020 with intercept-slope correlation
-  0.25, residual 0.215): the `is_sharing_data:k_z` coefficient is b = -0.092 per SD of k (SE 0.040, 95% CI
-  -0.169 to -0.014, p = 0.0217; likelihood-ratio test chi2 = 5.22, p = 0.022), which is b = -0.045 per year
-  (SD of k = 2.03) or about -4.4% per year in the yearly citations of `1 + citations`. Agreement across the
-  candidates: all four negative, 3 of 4 significant (`k + k^2` p = 0.028, `log(k)` p = 0.034, linear `k`
-  b = -0.077 per SD, p = 0.051). With random intercepts only all four are significant (p = 0.003 to 0.009)
-  and the SE is about 20% smaller (0.032 vs. 0.040), which is what the slope corrects. **The effect sits at
-  the edge of significance across specifications (p about 0.02 to 0.05), so the manuscript must not
-  present it as robust or noteworthy beyond that.** Predicted citations (geometric-mean scale) for a typical
-  article over k = 1 to 9: sharing 2.4, 2.6, 2.6, 2.4, 2.2, 1.9, 1.6, 1.4, 1.1 and non-sharing 2.0 rising to
-  2.5 at k = 3 then falling to 1.7.
-- **Citation dynamics, robustness (nb 10)**: same sign everywhere. Offsets (|t|, against 2.32 for `+ 1`):
-  `log(y + 0.5)` b = -0.114 (2.24, p = 0.026), `+ 0.25` b = -0.135 (2.14, p = 0.034), `+ 0.1` b = -0.162
-  (2.00, p = 0.047), zeros dropped (N = 1117) b = -0.096 (1.96, p = 0.0516, not significant): 4 of 5 keep
-  significance. Without k = 9: b = -0.096 per SD (p = 0.018), the same as with it. Families (winner, with
-  full random structure): raw-count Gaussian b = -0.41 citations per SD (SE 0.21, p = 0.0502, not
-  significant), Poisson rate ratio 0.870 per SD (p = 0.025, AIC 5515.9), NB with theta fixed at its
-  random-intercept estimate 0.870 (p = 0.019, AIC 5523.4): 2 of 3 significant. The Poisson overdispersion
-  ratio is 0.76 once the article slopes are in (it was 1.05 with random intercepts, where NB beat Poisson
-  on AIC, 5574.3 vs. 5636.7), so NB adds nothing here and Poisson has the lower AIC by 7.6; theta is held
-  at the random-intercept value, which is an approximation for the full-structure NB.
+  converged with the full random structure, none singular. AIC: `k + log(k)` 2370.5 (Akaike weight 0.99),
+  `k + k^2` +10.8, `log(k)` +15.2, `k` +20.3: a clear winner, no near-ties. Likelihood-ratio tests of the
+  shared term against linear `k`: `log_k_z` chi2 = 22.3 (p = 2e-6), `k_z^2` chi2 = 11.5 (p = 0.0007). With
+  random intercepts only the AICs are 2390.4, 2400.4, 2406.6 (`log(k)`) and 2406.1 (`k`) (the slope helps by
+  15.2 to 20.9 AIC). Winner `k + log(k)` (venue variance 0.024, article intercept 0.295, article slope on k_z
+  0.020 with intercept-slope correlation 0.30, residual 0.215): the `is_sharing_data:k_z` coefficient is
+  b = -0.093 per SD of k (SE 0.040, 95% CI -0.171 to -0.016, p = 0.0197; likelihood-ratio test chi2 = 5.39,
+  p = 0.020), which is b = -0.046 per year (SD of k = 2.03) or about -4.5% per year in the yearly citations
+  of `1 + citations`. Age (`log_weeks_since_pub`) is not significant (b = 0.14, p = 0.31), nor is the sharing
+  main effect at the mean k (b = 0.01, p = 0.91). Agreement across the candidates: all four negative and
+  significant (`k + k^2` p = 0.026, `log(k)` p = 0.032, linear `k` b = -0.078 per SD, p = 0.0465). With
+  random intercepts only all four are also significant (p = 0.002 to 0.008) and the SE is about 18% smaller
+  (0.032 vs. 0.040), which is what the slope corrects. **The effect sits at the edge of significance (p
+  about 0.02 to 0.05 across specifications), so the manuscript must not present it as robust or noteworthy
+  beyond that.** Predicted citations (geometric-mean scale) for a typical article over k = 1 to 9: sharing
+  2.3, 2.6, 2.5, 2.3, 2.1, 1.8, 1.6, 1.3, 1.1 and non-sharing 1.9, 2.3, 2.4, 2.4, 2.3, 2.1, 2.0, 1.8, 1.6.
+- **Citation dynamics, robustness (nb 10)**: same sign everywhere, and significant in every refit, but
+  several only just. Offsets (|t|, against 2.35 for `+ 1`): `log(y + 0.5)` b = -0.116 (2.28, p = 0.024),
+  `+ 0.25` b = -0.138 (2.19, p = 0.030), `+ 0.1` b = -0.166 (2.05, p = 0.042), zeros dropped (N = 1117)
+  b = -0.098 (1.98, p = 0.049). Without k = 9: b = -0.098 per SD (p = 0.016), the same as with it. Age
+  adjustment (winner refits): categorical publication year b = -0.092 (p = 0.022, AIC 2378.2), no age
+  predictor b = -0.093 (p = 0.020, AIC 2369.5), against -0.093 (p = 0.020, AIC 2370.5) with
+  `log_weeks_since_pub`: the interaction does not depend on the age term, and AIC does not favour either
+  age term. Families (winner): raw-count Gaussian b = -0.41 citations per SD (SE 0.21, p = 0.048), Poisson
+  rate ratio 0.869 per SD (p = 0.022, AIC 5507.4, full structure). The negative binomial with theta fixed at
+  its random-intercept estimate did **not** converge (or was singular) with the full structure and fell back
+  to random intercepts (rate ratio 0.861, p = 0.0004, AIC 5550.7): that p is not comparable (its SE is 0.042
+  against 0.062 for the Poisson, the understatement the random slope exists to remove), and its AIC is not
+  comparable with the Poisson's. The Poisson overdispersion ratio was 0.76 with the full structure in an
+  earlier run (categorical publication year; not printed now, because the NB fell back) and 1.05 with random
+  intercepts, where NB beat Poisson on AIC (5574.3 vs. 5636.7).
 - **Citation dynamics** (v1, superseded, nb 10): significant cumulative advantage in Years 1-4, marginal in 5-7,
   null by Year 8. Citation *velocity* differs only in Year 1 — read as early visibility
   rather than a sustained rate difference. Attrition caveat: N = 234 at Year 1 falls to
