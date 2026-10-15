@@ -82,7 +82,16 @@ fit <- withCallingHandlers(
 convergence_problems <- unlist(fit@optinfo$conv$lme4$messages)
 messages <- unique(c(messages, convergence_problems))
 
+# Nakagawa's marginal (fixed effects) and conditional (fixed + random effects) R^2, with random slopes handled by `performance`;
+# approximate for the count families. NA when `performance` is missing or cannot compute it
+nakagawa_r2 <- function(fit) {
+  r2 <- tryCatch(suppressMessages(suppressWarnings(performance::r2_nakagawa(fit))), error = function(e) NULL)
+  if (is.null(r2)) return(list(marginal = NA, conditional = NA))
+  list(marginal = unname(r2$R2_marginal), conditional = unname(r2$R2_conditional))
+}
+
 is_count <- job$family != "gaussian"
+r2 <- nakagawa_r2(fit)
 result <- list(
   fit = list(
     n_obs = nobs(fit),
@@ -90,6 +99,9 @@ result <- list(
     # AIC is only comparable between fits of the same family and outcome (a Gaussian density and a count
     # pmf, or two Gaussians on different outcomes, are not), so callers decide what to compare
     aic = AIC(fit),
+    bic = BIC(fit),
+    r2_marginal = r2$marginal,
+    r2_conditional = r2$conditional,
     singular = isSingular(fit),
     converged = length(convergence_problems) == 0,
     messages = messages,

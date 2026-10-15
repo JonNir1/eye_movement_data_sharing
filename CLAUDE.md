@@ -196,7 +196,10 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   the winner's b, SE, 95% CI and p, a likelihood-ratio test of the interaction against the same model
   without it, and the per-year reading when the interaction is on linear k (`b / SD(k)`). `k + log(k)` and
   `k + k^2` nest linear k, so the shared term each adds is also tested directly with a likelihood-ratio test
-  (judged on fit alone, not on the sharing coefficient).
+  (judged on fit alone, not on the sharing coefficient). The winner is also compared with the same model
+  without the interaction by likelihood-ratio test, AIC and BIC with their weights (they can disagree for a
+  modest effect: with one added term AIC accepts it at chi2 > 2, BIC at chi2 > log N), and every model table
+  carries Nakagawa's marginal and conditional R2 (`fit_glmm` returns them, and the BIC, in its metadata).
 
   **Robustness #1 (outcome).** The winner is refitted with `log(y + c)` for c = 0.5, 0.25, 0.1 and with the
   zeros dropped (coefficients are on different scales, so compare |t|; dropping the zeros also changes the
@@ -459,12 +462,16 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   b = -0.093 per SD of k (SE 0.040, 95% CI -0.171 to -0.016, p = 0.0197; likelihood-ratio test chi2 = 5.39,
   p = 0.020), which is b = -0.046 per year (SD of k = 2.03) or about -4.5% per year in the yearly citations
   of `1 + citations`. Age (`log_weeks_since_pub`) is not significant (b = 0.14, p = 0.31), nor is the sharing
-  main effect at the mean k (b = 0.01, p = 0.91). Agreement across the candidates: all four negative and
+  main effect at the mean k (b = 0.01, p = 0.91). Against the same model without the interaction, the
+  winner wins on AIC by 3.4 (weight 0.84) but loses on BIC by 1.8 (weight 0.71): modest evidence either
+  way. Marginal R2 is 0.073 with the interaction and 0.074 without it (conditional R2 0.639 with it), so
+  the interaction explains essentially no extra variance. Agreement across the candidates: all four negative and
   significant (`k + k^2` p = 0.026, `log(k)` p = 0.032, linear `k` b = -0.078 per SD, p = 0.0465). With
   random intercepts only all four are also significant (p = 0.002 to 0.008) and the SE is about 18% smaller
   (0.032 vs. 0.040), which is what the slope corrects. **The effect sits at the edge of significance (p
   about 0.02 to 0.05 across specifications), so the manuscript must not present it as robust or noteworthy
-  beyond that.** The figure shows predicted mean citations per year for a typical article, back-transformed
+  beyond that.** The figure shows predicted mean citations per year for a typical article (with the raw observed means as open circles,
+  `SHOW_OBSERVED_MEANS`; they are unadjusted, the curves are adjusted), back-transformed
   from `log(1 + y)` as `exp(prediction + variance / 2) - 1` with the model's total random variance (the
   lognormal correction; without it the curves are geometric means, about 1 citation too low). Over k = 1 to
   9: sharing 3.2, 3.6, 3.6, 3.4, 3.1, 2.8, 2.6, 2.3, 2.1 and non-sharing 2.7, 3.2, 3.4, 3.4, 3.3, 3.2, 3.1,
