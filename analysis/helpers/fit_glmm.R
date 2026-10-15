@@ -99,6 +99,7 @@ result <- list(
     # AIC is only comparable between fits of the same family and outcome (a Gaussian density and a count
     # pmf, or two Gaussians on different outcomes, are not), so callers decide what to compare
     aic = AIC(fit),
+    bic = BIC(fit),
     r2_marginal = r2$marginal,
     r2_conditional = r2$conditional,
     singular = isSingular(fit),

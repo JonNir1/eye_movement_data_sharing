@@ -86,3 +86,4 @@ class TestNakagawaR2:
     def test_count_fits_report_the_r2_keys(self):
         result = fit_glmm(make_poisson_data(), "y ~ x + (1 | g)", "poisson", factors=("g",))
         assert "r2_marginal" in result.fit and "r2_conditional" in result.fit
+        assert result.fit["bic"] > result.fit["aic"]            # N is above e^2, so the BIC penalty is the larger
