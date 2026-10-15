@@ -464,8 +464,13 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   random intercepts only all four are also significant (p = 0.002 to 0.008) and the SE is about 18% smaller
   (0.032 vs. 0.040), which is what the slope corrects. **The effect sits at the edge of significance (p
   about 0.02 to 0.05 across specifications), so the manuscript must not present it as robust or noteworthy
-  beyond that.** Predicted citations (geometric-mean scale) for a typical article over k = 1 to 9: sharing
-  2.3, 2.6, 2.5, 2.3, 2.1, 1.8, 1.6, 1.3, 1.1 and non-sharing 1.9, 2.3, 2.4, 2.4, 2.3, 2.1, 2.0, 1.8, 1.6.
+  beyond that.** The figure shows predicted mean citations per year for a typical article, back-transformed
+  from `log(1 + y)` as `exp(prediction + variance / 2) - 1` with the model's total random variance (the
+  lognormal correction; without it the curves are geometric means, about 1 citation too low). Over k = 1 to
+  9: sharing 3.2, 3.6, 3.6, 3.4, 3.1, 2.8, 2.6, 2.3, 2.1 and non-sharing 2.7, 3.2, 3.4, 3.4, 3.3, 3.2, 3.1,
+  3.0, 2.9. For the observed articles' own covariates the predicted mean over all article-years is 3.29
+  against an observed 3.34. On the geometric-mean scale the same curves are 2.3, 2.6, 2.5, 2.3, 2.1, 1.8,
+  1.6, 1.3, 1.1 (sharing) and 1.9, 2.3, 2.4, 2.4, 2.3, 2.1, 2.0, 1.8, 1.6 (non-sharing).
 - **Citation dynamics, robustness (nb 10)**: same sign everywhere, and significant in every refit, but
   several only just. Offsets (|t|, against 2.35 for `+ 1`): `log(y + 0.5)` b = -0.116 (2.28, p = 0.024),
   `+ 0.25` b = -0.138 (2.19, p = 0.030), `+ 0.1` b = -0.166 (2.05, p = 0.042), zeros dropped (N = 1117)
