@@ -66,3 +66,23 @@ class TestFitGlmm:
     def test_an_r_error_is_raised_with_rs_message(self):
         with pytest.raises(RuntimeError, match="R failed"):
             fit_glmm(make_poisson_data(), "y ~ not_a_column + (1 | g)", "poisson", factors=("g",))
+
+
+def make_gaussian_data(seed: int = 0, n_groups: int = 20, per_group: int = 30) -> pd.DataFrame:
+    """Normal outcomes with a fixed slope on `x`, and a random intercept and slope per group."""
+    rng = np.random.default_rng(seed)
+    group = np.repeat(np.arange(n_groups), per_group)
+    x = rng.normal(size=group.size)
+    intercepts, slopes = rng.normal(scale=0.7, size=n_groups)[group], rng.normal(scale=0.3, size=n_groups)[group]
+    return pd.DataFrame({"g": group, "x": x, "y": 1.0 + (0.8 + slopes) * x + intercepts + rng.normal(size=group.size)})
+
+
+class TestNakagawaR2:
+    def test_gaussian_fit_reports_marginal_below_conditional_r2(self):
+        result = fit_glmm(make_gaussian_data(), "y ~ x + (1 + x | g)", "gaussian", factors=("g",))
+        marginal, conditional = result.fit["r2_marginal"], result.fit["r2_conditional"]
+        assert 0 < marginal < conditional < 1
+
+    def test_count_fits_report_the_r2_keys(self):
+        result = fit_glmm(make_poisson_data(), "y ~ x + (1 | g)", "poisson", factors=("g",))
+        assert "r2_marginal" in result.fit and "r2_conditional" in result.fit
