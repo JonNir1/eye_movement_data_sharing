@@ -87,3 +87,12 @@ class TestNakagawaR2:
         result = fit_glmm(make_poisson_data(), "y ~ x + (1 | g)", "poisson", factors=("g",))
         assert np.isnan(result.fit["r2_marginal"]) and np.isnan(result.fit["r2_conditional"])
         assert result.fit["bic"] > result.fit["aic"]            # N is above e^2, so the BIC penalty is the larger
+
+
+class TestFixedEffectsCovariance:
+    def test_the_diagonal_is_the_squared_standard_errors(self):
+        result = fit_glmm(make_gaussian_data(), "y ~ x + (1 | g)", "gaussian", factors=("g",))
+        covariance = result.fixed_effects_cov
+        assert list(covariance.index) == list(covariance.columns) == list(result.fixed_effects.index)
+        assert np.allclose(np.diag(covariance), result.fixed_effects["se"] ** 2)
+        assert np.allclose(covariance, covariance.T)

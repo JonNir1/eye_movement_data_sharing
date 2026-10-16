@@ -17,7 +17,7 @@ current in-progress revision; `brief report.pdf` is the version that was submitt
 
 ```
 data/       acquisition only - OpenAlex/CrossRef fetching, and _api_secrets.py
-analysis/   ten notebooks, one per research question, plus helpers/
+analysis/   eleven notebooks, one per research question, plus helpers/
 output/     exported figures
 data_store/ source data AND the derived parquet frames (gitignored)
 ```
@@ -59,9 +59,10 @@ between notebooks.
 | `08_fwci` | Do sharing articles score higher on field-weighted impact? |
 | `09_results_figures` | The manuscript figures that summarize nb 07 and nb 08 together: sharing vs. non-sharing violins and the supplementary granularity bars |
 | `10_citation_dynamics` | When does the advantage appear, and does it persist? |
+| `11_granularity_dynamics` | Within the 80 sharing articles, do the three granularities differ in how their yearly citations change over time? |
 
 `analysis/helpers/` holds only code that two or more notebooks import (`config`, `dataset`,
-`stats`, `plotting`, `r_models`). Single-notebook helpers stay inline on purpose. There is no
+`stats`, `plotting`, `r_models`, `dynamics`). Single-notebook helpers stay inline on purpose. There is no
 `__init__.py` anywhere — these are namespace packages, and helper modules use absolute
 imports (`from helpers.config import ...`).
 
@@ -220,6 +221,28 @@ Decisions already taken, each of which needs re-arguing before it is changed:
 
   Limits stated in the notebook: serial correlation within an article is not modelled, and the age term
   (cohort) plus k absorb any linear calendar-year trend into the k slope.
+
+  **Code layout shared by nb 10 and nb 11.** `helpers/dynamics.py` holds the mechanics, each notebook keeps its
+  narrative, decisions and one visible `ModelSpec` (group term, candidate g(k) terms, covariates, random
+  structures): the article-year frame, `TimeScale` / `add_time_terms`, `prediction_grid`, `ModelSpec.formula`,
+  `fit_with_fallback`, the comparison / effect / omnibus tables, `to_mean_citations` (the lognormal
+  back-transform), and for a three-class group `add_class_dummies`, `fit_clustered_ols`, `wald_omnibus`,
+  `lrt_omnibus` and `class_slopes`. The figure is `helpers.plotting.plot_citation_dynamics` (groups as data).
+  `fit_glmm` also returns the fixed-effects covariance (`fixed_effects_cov`), which a contrast of coefficients
+  needs, and `helpers.stats.contrasts_from_estimates` is the contrast core that `pairwise_contrasts` wraps.
+- **Citation dynamics by sharing granularity is nb 11**, the nb 10 analysis on the 80 sharers with
+  `(is_trial + is_fixation) * k_z` (PARTICIPANT baseline). Decided for N = 80 (23 / 26 / 31 articles, 422
+  article-years, 3 to 9 years each, at most 7 article-years per class from year 8): **no model search**
+  (nb 10's `k + log(k)` is carried over and not re-selected); **no venue random effect** (9 of 20 venues
+  have one sharing article, as for nb 7-8's Model 1), with venue impact as a covariate; the time scale is
+  nb 10's (all 234 articles), so per-SD coefficients are comparable; and a **ladder of random structures**,
+  the first usable (converged, not singular) rung primary: `(1 + k_z | article)`, then `(1 | article)`, then
+  pooled OLS with article-clustered SEs (CR1, t on 79 df: nb 7-8's Model 1 made valid for repeated
+  measures). All three are always reported. The reported test is the 2-df omnibus (likelihood-ratio for the
+  mixed rungs, Wald for all); the three pairwise slope contrasts (BH) and the class slopes are shown, not
+  chased. Robustness is compact: the three rungs, offsets 0.5 and 0.1, zeros dropped, `k >= 8` dropped and a
+  Poisson; no age check and no negative binomial. The expectation that the maximal structure would be
+  singular at this N was wrong: it converged without a singular fit, so it is the primary rung.
 - **FWCI is the declared primary endpoint**, as it was in v1. The other two citation DVs are
   secondary operationalizations. No multiplicity correction across the three: they are near
   functions of the same counts, so the effective number of tests is close to one. BH still
@@ -241,11 +264,9 @@ Still open:
 - **Bayes factors are not implemented anywhere.** This is the one reviewer request the current
   plan does not touch, and it is what would let the null sharing effect be reported as evidence
   for the null rather than hedged.
-- **Citation dynamics by sharing granularity (nb 10).** The sharing vs. non-sharing model is
-  implemented (see "Decisions already taken"); the same model with `sharing_class * k` on the 80
-  sharers is not yet. Also worth one sentence in the manuscript on why time is binned annually, since
-  the reviewer's page-6 comment suggests expressing things in weeks: OpenAlex serves
-  `counts_by_year`, so annual is the finest resolution the source supports.
+- **Why time is binned annually.** Worth one sentence in the manuscript, since the reviewer's page-6
+  comment suggests expressing things in weeks: OpenAlex serves `counts_by_year`, so annual is the
+  finest resolution the source supports. (The granularity version of the dynamics analysis is nb 11.)
 
 ## For the discussion
 
@@ -505,6 +526,17 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   sharers (omnibus Wald p = 0.36, 0.16, 0.29, 0.16 for Models 0-3). In nb 08 the venue variance of
   Model 3 still collapses to about zero on the sharers (ICC 0.0002), so it is effectively Model 1; in
   nb 07 it no longer does under REML (ICC 0.03).
+- **Granularity does not matter for the citation dynamics either (nb 11)**: all three rungs are usable and
+  agree. The class-by-time omnibus (2 df) is null with `(1 + k_z | article)` (primary; Wald chi2 = 2.54,
+  p = 0.28; likelihood-ratio chi2 = 2.52, p = 0.28; R2 marginal 0.098, conditional 0.647; article intercept
+  variance 0.339, slope variance 0.015, correlation 0.63, residual 0.219), with `(1 | article)` (p = 0.31, LRT
+  and Wald alike), and with pooled OLS with article-clustered SEs (F(2) = 0.26, p = 0.77). Slope differences
+  from PARTICIPANT, per SD of k: TRIAL +0.132 (SE 0.087, p = 0.13), FIXATION +0.028 (SE 0.076, p = 0.71);
+  FIXATION - TRIAL -0.103 (p = 0.20); none survives BH (smallest 0.30). Each class's own linear-time slope
+  per SD of k: PARTICIPANT -0.239 (95% CI -0.443 to -0.035), TRIAL -0.107 (-0.331 to 0.117), FIXATION -0.211
+  (-0.403 to -0.018), i.e. -0.118, -0.053 and -0.104 per year: the intervals overlap widely, so the data
+  cannot tell the classes apart, which is not evidence that they are equal. Robustness (Wald omnibus p):
+  `log(y + 0.5)` 0.19, `+ 0.1` 0.10, zeros dropped 0.88, `k >= 8` dropped 0.26, Poisson 0.51.
 - **Covariate comparison**: sharers publish in higher-impact venues, are 4.30x more likely
   to have a preprint, and are more recent. No difference in author count, U.S. authorship,
   or open-access status.

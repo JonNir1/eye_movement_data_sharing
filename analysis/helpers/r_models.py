@@ -35,6 +35,8 @@ class GlmmResult:
     `predictions`, when requested, repeats the new data with `fit`, the 95% CI (`ci_low`, `ci_high`) and
     the +/- 1 SE interval (`sem_low`, `sem_high`) on the response scale (fixed effects only, i.e. the
     population-level prediction). The intervals are symmetric on the link scale, so not on the response scale.
+    `fixed_effects_cov` is the covariance matrix of the fixed-effect estimates (terms x terms), which a contrast of
+    coefficients needs: `fixed_effects` has only the SEs.
     """
     family: Family
     formula: str
@@ -42,6 +44,7 @@ class GlmmResult:
     fit: dict[str, Any]
     variance_components: pd.DataFrame
     predictions: Optional[pd.DataFrame]
+    fixed_effects_cov: Optional[pd.DataFrame] = None
 
 
 def find_rscript() -> str:
@@ -134,4 +137,5 @@ def fit_glmm(
         fit={key: (np.nan if value is None else value) for key, value in raw["fit"].items()},
         variance_components=pd.DataFrame(raw["variance_components"]),
         predictions=predictions,
+        fixed_effects_cov=pd.DataFrame(raw["fixed_effects_cov"]).set_index("term"),
     )

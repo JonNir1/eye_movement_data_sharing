@@ -16,7 +16,7 @@ from statsmodels.stats.multitest import multipletests
 from helpers.config import SHARING_CLASS_ORDER
 from helpers.stats import (
     _calculate_group_stats, compare_binary, compare_continuous, granularity_wald_test, model_diagnostics,
-    pairwise_contrasts, percent_difference, sharing_effect, significance_class,
+    contrasts_from_estimates, pairwise_contrasts, percent_difference, sharing_effect, significance_class,
 )
 
 SHARE_COL = "Is Sharing Data"
@@ -424,3 +424,33 @@ class TestPairwiseContrasts:
         table = pairwise_contrasts(fit, self.TERMS, "PARTICIPANT")
         assert table["p_FDR"].to_numpy() == pytest.approx(multipletests(table["p"], method="fdr_bh")[1])
         assert (table["p_FDR"] >= table["p"]).all() and (table["p_FDR"] <= 1).all()
+
+    def test_the_contrast_between_two_non_baseline_levels_matches_statsmodels_t_test(self):
+        for fit in self._fits({"PARTICIPANT": 0.0, "TRIAL": 0.3, "FIXATION": 0.6}).values():
+            weights = np.zeros((1, getattr(fit, "k_fe", len(fit.params))))
+            weights[0, list(fit.params.index).index(self.TERMS[1])] = 1
+            weights[0, list(fit.params.index).index(self.TERMS[0])] = -1
+            expected = fit.t_test(weights)
+            row = pairwise_contrasts(fit, self.TERMS, "PARTICIPANT").loc["FIXATION vs. TRIAL"]
+            assert row["SE"] == pytest.approx(float(np.squeeze(expected.sd)))
+            assert row["p"] == pytest.approx(float(np.squeeze(expected.pvalue)))
+
+
+class TestContrastsFromEstimates:
+    PARAMS = pd.Series({"Intercept": 0.0, "is_trial": 1.0, "is_fixation": 3.0})
+    COVARIANCE = pd.DataFrame(
+        [[1.0, 0.0, 0.0], [0.0, 1.0, 0.5], [0.0, 0.5, 2.0]], index=PARAMS.index, columns=PARAMS.index,
+    )
+    LEVELS = {"is_trial": "TRIAL", "is_fixation": "FIXATION"}
+
+    def test_the_se_of_a_difference_uses_the_covariance(self):
+        table = contrasts_from_estimates(self.PARAMS, self.COVARIANCE, self.LEVELS, "PARTICIPANT")
+        assert table.loc["FIXATION vs. TRIAL", "b"] == pytest.approx(2.0)
+        assert table.loc["FIXATION vs. TRIAL", "SE"] == pytest.approx(np.sqrt(2.0 + 1.0 - 2 * 0.5))      # var(a) + var(b) - 2 cov
+        assert table.loc["TRIAL vs. PARTICIPANT", "SE"] == pytest.approx(1.0)
+
+    def test_a_t_reference_is_wider_than_the_normal(self):
+        normal = contrasts_from_estimates(self.PARAMS, self.COVARIANCE, self.LEVELS, "PARTICIPANT")
+        t_reference = contrasts_from_estimates(self.PARAMS, self.COVARIANCE, self.LEVELS, "PARTICIPANT", df=5)
+        assert (t_reference["p"] > normal["p"]).all()
+        assert normal.loc["TRIAL vs. PARTICIPANT", "p"] == pytest.approx(2 * 0.15865525)           # z = 1

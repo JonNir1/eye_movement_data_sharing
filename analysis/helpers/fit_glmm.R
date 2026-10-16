@@ -52,6 +52,12 @@ fixed_effects <- function(fit) {
   )
 }
 
+# the covariance matrix of the fixed-effect estimates, as rows keyed by term (the SEs alone cannot give the SE of a contrast)
+fixed_effects_cov <- function(fit) {
+  covariance <- as.matrix(vcov(fit))
+  data.frame(term = rownames(covariance), covariance, check.names = FALSE, row.names = NULL)
+}
+
 variance_components <- function(fit) {
   components <- as.data.frame(VarCorr(fit))
   data.frame(
@@ -110,6 +116,7 @@ result <- list(
     theta = if (job$family != "nb") NA else if (!is.null(job$theta)) job$theta else getME(fit, "glmer.nb.theta")
   ),
   fixed_effects = fixed_effects(fit),
+  fixed_effects_cov = fixed_effects_cov(fit),
   variance_components = variance_components(fit)
 )
 if (!is.null(job$newdata)) result$predictions <- predictions(fit, read.csv(job$newdata, stringsAsFactors = FALSE))
