@@ -203,3 +203,129 @@ class TestBackTransform:
         out = to_mean_citations(predictions, self.COMPONENTS, "k_z")
         assert out.loc[0, "fit"] == pytest.approx(np.exp(1.0 + 0.52 / 2) - 1)
         assert predictions.loc[0, "fit"] == 1.0                      # the input is not modified
+
+
+# ---------------------------------------------------------------- a group with more than two levels (notebook 11)
+
+import statsmodels.formula.api as smf
+
+from helpers.dynamics import (
+    add_class_dummies, class_slopes, fit_clustered_ols, lrt_omnibus, omnibus_table, ols_as_glmm_result, wald_omnibus,
+)
+
+DUMMY_SPEC = ModelSpec(
+    group="(is_trial + is_fixation)",
+    candidates={"k": dict(time="{group} * k_z", no_interaction="{group} + k_z", slope="k_z")},
+    covariates="has_preprint",
+    random_effects={"full": "(1 + {slope} | article)", "intercept": "(1 | article)"},
+)
+
+
+def make_repeated_measures(seed: int = 0, per_class: int = 20) -> pd.DataFrame:
+    """Articles of three classes observed over 3 to 6 years, with a class-specific time slope and an article effect."""
+    rng = np.random.default_rng(seed)
+    rows = []
+    for class_index, level in enumerate(["PARTICIPANT", "TRIAL", "FIXATION"]):
+        for article in range(per_class):
+            effect = rng.normal(scale=0.5)
+            for k_z in np.linspace(-1, 1, rng.integers(3, 7)):
+                rows.append({
+                    "article": f"{level}-{article}", "sharing_class": level, "k_z": k_z, "has_preprint": rng.integers(0, 2),
+                    "y": 1.0 + (0.3 * (class_index - 1)) * k_z + effect + rng.normal(scale=0.4),
+                })
+    return pd.DataFrame(rows)
+
+
+class TestClassDummies:
+    def test_every_level_but_the_baseline_gets_a_dummy_in_class_order(self):
+        data = pd.DataFrame({"sharing_class": ["FIXATION", "PARTICIPANT", "TRIAL", "TRIAL"]})
+        out, dummies = add_class_dummies(data)
+        assert dummies == {"is_trial": "TRIAL", "is_fixation": "FIXATION"}
+        assert out["is_trial"].tolist() == [0, 0, 1, 1] and out["is_fixation"].tolist() == [1, 0, 0, 0]
+
+    def test_a_level_that_is_absent_gets_no_dummy(self):
+        _, dummies = add_class_dummies(pd.DataFrame({"sharing_class": ["PARTICIPANT", "TRIAL"]}))
+        assert dummies == {"is_trial": "TRIAL"}
+
+
+class TestClusteredOls:
+    def _fit(self):
+        data, _ = add_class_dummies(make_repeated_measures())
+        return data, fit_clustered_ols(DUMMY_SPEC, data, "y", "k", cluster="article")
+
+    def test_the_formula_has_the_fixed_part_only_and_the_dummies_expand(self):
+        assert DUMMY_SPEC.fixed_formula("y", "k") == "y ~ (is_trial + is_fixation) * k_z + has_preprint"
+        _, fit = self._fit()
+        assert list(group_by_time(fit).index) == ["is_trial:k_z", "is_fixation:k_z"]
+
+    def test_the_cluster_robust_se_and_df_come_from_statsmodels(self):
+        data, fit = self._fit()
+        direct = smf.ols("y ~ (is_trial + is_fixation) * k_z + has_preprint", data).fit(
+            cov_type="cluster", cov_kwds={"groups": pd.factorize(data["article"])[0]}, use_t=True)
+        assert np.allclose(fit.fixed_effects["se"], direct.bse) and np.allclose(fit.fixed_effects_cov, direct.cov_params())
+        assert fit.fit["df_denom"] == data["article"].nunique() - 1
+        assert is_usable(fit) and list(fit.variance_components["group"]) == ["Residual"]
+
+    def test_the_omnibus_is_the_f_test_on_the_cluster_df(self):
+        data, fit = self._fit()
+        direct = smf.ols("y ~ (is_trial + is_fixation) * k_z + has_preprint", data).fit(
+            cov_type="cluster", cov_kwds={"groups": pd.factorize(data["article"])[0]}, use_t=True)
+        restriction = np.zeros((2, len(direct.params)))
+        restriction[0, list(direct.params.index).index("is_trial:k_z")] = 1
+        restriction[1, list(direct.params.index).index("is_fixation:k_z")] = 1
+        expected = direct.wald_test(restriction, scalar=True)
+        result = wald_omnibus(fit, ["is_trial:k_z", "is_fixation:k_z"])
+        assert result["test"] == "Wald F" and result["statistic"] == pytest.approx(float(expected.statistic))
+        assert result["p"] == pytest.approx(float(expected.pvalue))
+
+    def test_predictions_have_the_columns_the_figure_needs(self):
+        data, _ = add_class_dummies(make_repeated_measures())
+        grid = pd.DataFrame({"is_trial": [0, 1], "is_fixation": [0, 0], "k_z": [0.0, 0.0], "has_preprint": [0.5, 0.5]})
+        fit = fit_clustered_ols(DUMMY_SPEC, data, "y", "k", newdata=grid)
+        assert {"fit", "ci_low", "ci_high", "sem_low", "sem_high"} <= set(fit.predictions.columns)
+        assert (fit.predictions["ci_low"] < fit.predictions["fit"]).all()
+
+    def test_ols_as_glmm_result_keeps_the_ols_r2_and_a_residual_variance(self):
+        data, _ = add_class_dummies(make_repeated_measures())
+        result = smf.ols("y ~ k_z", data).fit(cov_type="cluster", cov_kwds={"groups": pd.factorize(data["article"])[0]}, use_t=True)
+        fit = ols_as_glmm_result(result, "y ~ k_z")
+        assert fit.fit["r2_marginal"] == fit.fit["r2_conditional"] == pytest.approx(result.rsquared)
+        assert fit.variance_components.loc[0, "variance"] == pytest.approx(result.scale)
+
+
+class TestOmnibusAndSlopes:
+    def _fake_fit(self, log_lik: float = -100.0) -> GlmmResult:
+        names = ["Intercept", "k_z", "is_trial:k_z", "is_fixation:k_z"]
+        fixed = pd.DataFrame({"estimate": [0.0, -0.2, 0.1, 0.3], "se": 0.1, "statistic": 0.0, "p": 0.5}, index=names)
+        covariance = pd.DataFrame(np.diag([1.0, 0.04, 0.01, 0.04]), index=names, columns=names)
+        covariance.loc["is_trial:k_z", "is_fixation:k_z"] = covariance.loc["is_fixation:k_z", "is_trial:k_z"] = 0.01
+        return GlmmResult(
+            family="gaussian", formula="", fixed_effects=fixed, variance_components=pd.DataFrame(), predictions=None,
+            fit={"converged": True, "singular": False, "aic": 0.0, "n_obs": 10, "log_lik": log_lik, "r2_marginal": 0.1, "r2_conditional": 0.2},
+            fixed_effects_cov=covariance,
+        )
+
+    def test_the_wald_chi2_uses_the_covariance_between_the_terms(self):
+        fit = self._fake_fit()
+        beta = np.array([0.1, 0.3])
+        covariance = np.array([[0.01, 0.01], [0.01, 0.04]])
+        expected = float(beta @ np.linalg.inv(covariance) @ beta)
+        result = wald_omnibus(fit, ["is_trial:k_z", "is_fixation:k_z"])
+        assert result["test"] == "Wald chi2" and result["df"] == 2 and result["statistic"] == pytest.approx(expected)
+
+    def test_the_likelihood_ratio_is_twice_the_log_likelihood_gain_and_never_negative(self):
+        assert lrt_omnibus(self._fake_fit(-98.0), self._fake_fit(-100.0), df=2)["statistic"] == pytest.approx(4.0)
+        assert lrt_omnibus(self._fake_fit(-101.0), self._fake_fit(-100.0), df=2)["statistic"] == 0.0
+
+    def test_class_slopes_add_the_interaction_to_the_time_coefficient_with_the_covariance(self):
+        table = class_slopes(self._fake_fit(), {"is_trial": "TRIAL", "is_fixation": "FIXATION"}, "PARTICIPANT", "k_z", k_sd=2.0)
+        assert table["b (per SD)"].tolist() == pytest.approx([-0.2, -0.1, 0.1])
+        assert table.loc["PARTICIPANT", "SE"] == pytest.approx(0.2)                       # sqrt(0.04)
+        assert table.loc["TRIAL", "SE"] == pytest.approx(np.sqrt(0.04 + 0.01))           # no covariance with the intercept slope term
+        assert table.loc["FIXATION", "b (per year)"] == pytest.approx(0.05)
+        assert table.loc["FIXATION", "% change per year"] == pytest.approx(100 * np.expm1(0.05))
+
+    def test_the_omnibus_table_reports_each_refits_structure_and_significance(self):
+        table = omnibus_table({"a": (self._fake_fit(), "full"), "b": (self._fake_fit(), "intercept")})
+        assert list(table["structure"]) == ["full", "intercept"] and table["df"].tolist() == [2, 2]
+        assert table["significant"].dtype == bool

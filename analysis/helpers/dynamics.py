@@ -12,8 +12,11 @@ from typing import NamedTuple, Optional
 
 import numpy as np
 import pandas as pd
+import statsmodels.formula.api as smf
+from scipy import stats
 
 from helpers import dataset
+from helpers.config import SHARING_CLASS_ORDER
 from helpers.r_models import GlmmResult, fit_glmm
 
 ALPHA = 0.05
@@ -132,15 +135,21 @@ class ModelSpec:
     def covariate_names(self) -> list[str]:
         return self.covariates.split(" + ")
 
+    def fixed_formula(
+            self, outcome: str, candidate: str, interaction: bool = True, covariates: Optional[str] = None,
+    ) -> str:
+        """The fixed-effects part of the formula (what a model without random effects is fitted with)."""
+        spec = self.candidates[candidate]
+        time_terms = (spec["time"] if interaction else spec["no_interaction"]).format(group=self.group)
+        return f"{outcome} ~ {time_terms} + {covariates or self.covariates}"
+
     def formula(
             self, outcome: str, candidate: str, structure: str, interaction: bool = True, covariates: Optional[str] = None,
     ) -> str:
         """The lme4 formula of `candidate` with the random `structure`; `interaction=False` drops the group-by-time
         interaction (its null model), `covariates` replaces the spec's covariates (for the robustness checks)."""
-        spec = self.candidates[candidate]
-        time_terms = (spec["time"] if interaction else spec["no_interaction"]).format(group=self.group)
-        random_effects = self.random_effects[structure].format(slope=spec["slope"])
-        return f"{outcome} ~ {time_terms} + {covariates or self.covariates} + {random_effects}"
+        random_effects = self.random_effects[structure].format(slope=self.candidates[candidate]["slope"])
+        return f"{self.fixed_formula(outcome, candidate, interaction, covariates)} + {random_effects}"
 
 
 def is_usable(fit: GlmmResult) -> bool:
@@ -231,3 +240,110 @@ def to_mean_citations(predictions: pd.DataFrame, variance_components: pd.DataFra
     interval_columns = ["fit", "ci_low", "ci_high", "sem_low", "sem_high"]
     out[interval_columns] = np.exp(out[interval_columns].add(half_variance, axis=0)) - 1
     return out
+
+
+# ---------------------------------------------------------------- a group with more than two levels (notebook 11)
+
+def add_class_dummies(df: pd.DataFrame, column: str = "sharing_class", baseline: str = "PARTICIPANT") -> tuple[pd.DataFrame, dict[str, str]]:
+    """0/1 dummies for every level of `column` but the baseline (`is_trial`, `is_fixation`), in the order of
+    `SHARING_CLASS_ORDER`. Dummies instead of a categorical keep the R bridge generic and make the reference explicit.
+
+    :return: the frame with the dummies, and the dummy -> level mapping (`{"is_trial": "TRIAL", ...}`).
+    """
+    levels = [level for level in SHARING_CLASS_ORDER if level != baseline and level in set(df[column])]
+    dummies = {f"is_{level.lower()}": level for level in levels}
+    return df.assign(**{name: (df[column] == level).astype(int) for name, level in dummies.items()}), dummies
+
+
+def ols_as_glmm_result(result, formula: str, newdata: Optional[pd.DataFrame] = None) -> GlmmResult:
+    """A fitted statsmodels OLS (with cluster-robust SEs) in the shape of a `GlmmResult`, so that it goes through the
+    same tables as the mixed models. It has no random effects: its one variance component is the residual, which
+    also holds the between-article variance. Its R2 is the OLS R2 (marginal and conditional coincide), its AIC is
+    the Gaussian ML AIC, and `df_denom` is the cluster-based degrees of freedom for F tests."""
+    z = 1.959964
+    fixed = pd.DataFrame({"estimate": result.params, "se": result.bse, "statistic": result.tvalues, "p": result.pvalues})
+    predictions = None
+    if newdata is not None:
+        prediction = result.get_prediction(newdata)
+        link, se = np.asarray(prediction.predicted_mean), np.asarray(prediction.se_mean)
+        predictions = newdata.reset_index(drop=True).assign(
+            fit=link, ci_low=link - z * se, ci_high=link + z * se, sem_low=link - se, sem_high=link + se,
+        )
+    return GlmmResult(
+        family="gaussian", formula=formula, fixed_effects=fixed,
+        fit={
+            "n_obs": int(result.nobs), "log_lik": result.llf, "aic": result.aic, "bic": result.bic, "converged": True, "singular": False,
+            "r2_marginal": result.rsquared, "r2_conditional": result.rsquared, "overdispersion": np.nan, "theta": np.nan,
+            "messages": [], "df_denom": float(result.df_resid_inference),
+        },
+        variance_components=pd.DataFrame([{"group": "Residual", "term": np.nan, "term2": np.nan, "variance": result.scale, "sd": np.sqrt(result.scale)}]),
+        predictions=predictions, fixed_effects_cov=result.cov_params(),
+    )
+
+
+def fit_clustered_ols(
+        spec: ModelSpec, data: pd.DataFrame, outcome: str, candidate: str, cluster: str = "article",
+        interaction: bool = True, covariates: Optional[str] = None, newdata: Optional[pd.DataFrame] = None,
+) -> GlmmResult:
+    """The model without random effects: pooled OLS with SEs clustered by `cluster` (CR1, t on clusters - 1 df). The same
+    article contributes several years, so plain OLS would understate the SEs; this is notebook 7-8's Model 1, made
+    valid for repeated measures, and the last rung of the ladder because it always converges."""
+    formula = spec.fixed_formula(outcome, candidate, interaction, covariates)
+    result = smf.ols(formula.replace("^", "**"), data=data).fit(
+        cov_type="cluster", cov_kwds={"groups": pd.factorize(data[cluster])[0], "use_correction": True}, use_t=True,
+    )
+    return ols_as_glmm_result(result, formula, newdata)
+
+
+def wald_omnibus(fit: GlmmResult, terms: list[str]) -> dict:
+    """Joint Wald test that the coefficients `terms` are all zero, from the fit's covariance matrix: chi-square, or F on
+    the cluster degrees of freedom for a fit that has them (the cluster-robust OLS)."""
+    beta = fit.fixed_effects.loc[terms, "estimate"].to_numpy()
+    covariance = fit.fixed_effects_cov.loc[terms, terms].to_numpy()
+    chi2, df = float(beta @ np.linalg.solve(covariance, beta)), len(terms)
+    denominator = fit.fit.get("df_denom")
+    if denominator is None or np.isnan(denominator):
+        return {"test": "Wald chi2", "statistic": chi2, "df": df, "p": float(stats.chi2.sf(chi2, df))}
+    return {"test": "Wald F", "statistic": chi2 / df, "df": df, "p": float(stats.f.sf(chi2 / df, df, denominator))}
+
+
+def lrt_omnibus(full: GlmmResult, null: GlmmResult, df: int) -> dict:
+    """Likelihood-ratio test of the `df` terms the full model has and the null model lacks (both fitted by ML)."""
+    chi2 = max(0.0, 2 * (full.fit["log_lik"] - null.fit["log_lik"]))
+    return {"test": "LRT chi2", "statistic": chi2, "df": df, "p": float(stats.chi2.sf(chi2, df))}
+
+
+def class_slopes(fit: GlmmResult, dummies: dict[str, str], baseline: str, time_term: str, k_sd: float) -> pd.DataFrame:
+    """The linear-time slope of every class: the baseline's is the time coefficient, another class's is that plus its
+    dummy-by-time interaction (a linear combination, so its SE uses the covariance). In the model's units (per SD of
+    time) and per year (`/ k_sd`, with the percent change of `1 + citations` that it implies)."""
+    params, covariance = fit.fixed_effects["estimate"], fit.fixed_effects_cov
+    z = 1.959964
+    rows = {}
+    for level, interaction in [(baseline, None)] + [(level, f"{dummy}:{time_term}") for dummy, level in dummies.items()]:
+        weights = pd.Series(0.0, index=params.index)
+        weights[time_term] = 1
+        if interaction is not None:
+            weights[interaction] = 1
+        b = float(weights @ params)
+        se = float(np.sqrt(weights @ covariance.loc[params.index, params.index] @ weights))
+        rows[level] = {
+            "b (per SD)": b, "SE": se, "CI low": b - z * se, "CI high": b + z * se,
+            "b (per year)": b / k_sd, "% change per year": 100 * np.expm1(b / k_sd),
+        }
+    table = pd.DataFrame(rows).T
+    table.index.name = "Class"
+    return table
+
+
+def omnibus_table(fits: dict[str, tuple[GlmmResult, str]]) -> pd.DataFrame:
+    """The Wald omnibus test of the group-by-time interaction of each refit, with its structure and convergence."""
+    rows = {}
+    for name, (fit, structure) in fits.items():
+        test = wald_omnibus(fit, list(group_by_time(fit).index))
+        rows[name] = {
+            "structure": structure, "converged": fit.fit["converged"], "singular": fit.fit["singular"], "N": fit.fit["n_obs"],
+            "R2 marginal": r2_of(fit, "marginal"), "R2 conditional": r2_of(fit, "conditional"),
+            "test": test["test"], "statistic": test["statistic"], "df": test["df"], "p": test["p"], "significant": bool(test["p"] < ALPHA),
+        }
+    return pd.DataFrame.from_dict(rows, orient="index")
