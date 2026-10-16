@@ -7,6 +7,7 @@ Replaces the copy-pasted `if False:` export blocks in the original notebook (cel
 from copy import deepcopy
 from dataclasses import dataclass
 
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
@@ -63,6 +64,7 @@ def plot_citation_dynamics(
         show_observed_means: bool = True,
         show_counts: bool = True,
         height: int = 500,
+        reserve_table_space: bool = False,
 ) -> go.Figure:
     """Yearly citations by group: the model's predictions (a line with filled markers), the observed means (open
     markers just left of them), one legend per group, and an inset table of the articles behind each year.
@@ -75,6 +77,8 @@ def plot_citation_dynamics(
         back-transform to citations).
     :param show_observed_means: the raw (unadjusted) means, +/- their SEM.
     :param show_counts: the inset table of article counts.
+    :param reserve_table_space: extend the y axis below zero (no tick labels there) and put the table in that band, for data
+        with means near zero that the table would otherwise cover. By default the table sits in the lower right of the plot.
     """
     years = sorted(groups[0].predictions["k"].unique())
     x_range = [years[0] - 0.75, years[-1] + 0.5]
@@ -135,6 +139,13 @@ def plot_citation_dynamics(
         tickfont=AXIS_TICK_FONT, tickmode="linear", dtick=1, range=x_range,
     )
     fig.update_yaxes(title=dict(text="Annual Citations", font=AXIS_TITLE_FONT, standoff=15), tickfont=AXIS_TICK_FONT, rangemode="tozero")
+    if show_counts and reserve_table_space:
+        top = 1.05 * max(
+            max(np.nanmax(group.predictions["sem_high"]), np.nanmax(group.observed["mean"] + group.observed["sem"].fillna(0)))
+            for group in groups
+        )
+        table_top = round(0.02 + 0.2 * (len(groups) + 1) / 3, 4)           # where the table ends, as a fraction of the plot height
+        fig.update_yaxes(range=[-top * table_top / (1 - table_top), top], tickvals=list(range(0, int(top) + 1)))     # zero sits on the table's top edge
     fig.update_layout(
         width=800, height=height,
         title=dict(text=title, font=TITLE_FONT, x=0.5, xanchor="center"),

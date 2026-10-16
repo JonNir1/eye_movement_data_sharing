@@ -63,3 +63,14 @@ class TestPlotCitationDynamics:
         fig = plot_citation_dynamics([make_group("Sharing", 0.5), make_group("Non-Sharing", 0.0)], "title")
         table = next(trace for trace in fig.data if isinstance(trace, go.Table))
         assert 0 < table.domain.x[0] < table.domain.x[1] <= 1
+
+    def test_reserved_table_space_extends_the_y_axis_below_zero_without_negative_ticks(self):
+        groups = [make_group("Sharing", 0.5), make_group("Non-Sharing", 0.0)]
+        plain = plot_citation_dynamics(groups, "title")
+        reserved = plot_citation_dynamics(groups, "title", reserve_table_space=True)
+        assert plain.layout.yaxis.range is None
+        low, high = reserved.layout.yaxis.range
+        assert low < 0 < high and min(reserved.layout.yaxis.tickvals) == 0
+        assert high > max(float(group.predictions["sem_high"].max()) for group in groups)
+        no_table = plot_citation_dynamics(groups, "title", show_counts=False, reserve_table_space=True)
+        assert no_table.layout.yaxis.range is None
