@@ -8,7 +8,7 @@ globals.
 
 import itertools
 import re
-from typing import Dict, Literal, Union
+from typing import Dict, Literal, Union, Optional
 
 import numpy as np
 import pandas as pd
@@ -102,40 +102,60 @@ def granularity_wald_test(result, terms: list[str]) -> dict:
     }
 
 
-def pairwise_contrasts(result, terms: list[str], baseline: str) -> pd.DataFrame:
-    """All pairwise contrasts between the levels of a categorical predictor in a fitted OLS or `MixedLM`
-    model: each level against the baseline (the coefficients themselves) and the non-baseline levels
-    against each other.
+def contrasts_from_estimates(
+        params: pd.Series, covariance: pd.DataFrame, levels: dict[str, str], baseline: str, df: Optional[float] = None,
+) -> pd.DataFrame:
+    """All pairwise contrasts between the levels of a categorical predictor, from the coefficients and their
+    covariance matrix: each level against the baseline (the coefficients themselves) and the non-baseline
+    levels against each other.
 
-    Each contrast is the later level minus the earlier one, in the order `[baseline, *terms]`, so
-    `exp(b)` is the ratio of the later level's geometric mean to the earlier one's for a log-scale
-    outcome. P-values are two-sided (t for OLS, z for `MixedLM`) and corrected across the contrasts by
-    Benjamini-Hochberg.
+    Each contrast is the later level minus the earlier one, in the order `[baseline, *levels]`, so `exp(b)` is
+    the ratio of the later level's geometric mean to the earlier one's for a log-scale outcome. P-values are
+    two-sided and corrected across the contrasts by Benjamini-Hochberg.
 
-    :param terms: the non-baseline dummies as they appear in `result.params`, e.g.
-        `C(sharing_class)[T.TRIAL]`.
-    :param baseline: the reference level, e.g. `PARTICIPANT`.
-    :return: one row per contrast (`TRIAL vs. PARTICIPANT`) with `b`, `SE`, `t`, `p`, `p_FDR`,
-        `ratio` and `% change`.
+    :param params: the model's coefficients, indexed by term.
+    :param covariance: their covariance matrix (terms x terms).
+    :param levels: the non-baseline dummy terms, in order, mapped to their level names, e.g.
+        `{"C(sharing_class)[T.TRIAL]": "TRIAL"}`.
+    :param baseline: the reference level's name, e.g. `PARTICIPANT`.
+    :param df: degrees of freedom of the t reference distribution, or None for the normal.
+    :return: one row per contrast (`TRIAL vs. PARTICIPANT`) with `b`, `SE`, `t`, `p`, `p_FDR`, `ratio` and `% change`.
     """
-    levels = [baseline] + [re.search(r"\[T\.(.+)\]$", term).group(1) for term in terms]
-    positions = [None] + [result.params.index.get_loc(term) for term in terms]
+    names = [baseline] + list(levels.values())
+    terms = [None] + list(levels)
+    covariance = covariance.loc[params.index, params.index]
     rows = {}
-    for earlier, later in itertools.combinations(range(len(levels)), 2):
-        weights = np.zeros((1, getattr(result, "k_fe", len(result.params))))     # MixedLM.t_test takes the fixed effects only
-        weights[0, positions[later]] = 1
-        if positions[earlier] is not None:
-            weights[0, positions[earlier]] = -1
-        test = result.t_test(weights)
-        b = float(np.squeeze(test.effect))
-        rows[f"{levels[later]} vs. {levels[earlier]}"] = {
-            "b": b, "SE": float(np.squeeze(test.sd)), "t": float(np.squeeze(test.tvalue)), "p": float(np.squeeze(test.pvalue)),
-            "ratio": np.exp(b), "% change": percent_difference(b),
+    for earlier, later in itertools.combinations(range(len(names)), 2):
+        weights = pd.Series(0.0, index=params.index)
+        weights[terms[later]] = 1
+        if terms[earlier] is not None:
+            weights[terms[earlier]] = -1
+        b = float(weights @ params)
+        se = float(np.sqrt(weights @ covariance @ weights))
+        statistic = b / se
+        tail = stats.norm.sf(abs(statistic)) if df is None else stats.t.sf(abs(statistic), df)
+        rows[f"{names[later]} vs. {names[earlier]}"] = {
+            "b": b, "SE": se, "t": statistic, "p": float(2 * tail), "ratio": np.exp(b), "% change": percent_difference(b),
         }
     table = pd.DataFrame(rows).T
     table.insert(4, "p_FDR", multipletests(table["p"], method="fdr_bh")[1])
     table.index.name = "Contrast"
     return table
+
+
+def pairwise_contrasts(result, terms: list[str], baseline: str) -> pd.DataFrame:
+    """`contrasts_from_estimates` for a fitted statsmodels OLS or `MixedLM` model (t on its residual or
+    cluster degrees of freedom for OLS, z for `MixedLM`).
+
+    :param terms: the non-baseline dummies as they appear in `result.params`, e.g.
+        `C(sharing_class)[T.TRIAL]`.
+    :param baseline: the reference level, e.g. `PARTICIPANT`.
+    """
+    levels = {term: re.search(r"\[T\.(.+)\]$", term).group(1) for term in terms}
+    n_fixed = getattr(result, "k_fe", len(result.params))             # a MixedLM's params also hold the random effects
+    fixed = result.params.iloc[:n_fixed]
+    df = getattr(result, "df_resid_inference", result.df_resid) if getattr(result, "use_t", False) else None      # G - 1 when clustered
+    return contrasts_from_estimates(fixed, result.cov_params().iloc[:n_fixed, :n_fixed], levels, baseline, df)
 
 
 def compare_binary(
