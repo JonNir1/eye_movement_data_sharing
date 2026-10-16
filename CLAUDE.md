@@ -207,7 +207,7 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   zeros dropped (coefficients are on different scales, so compare |t|; dropping the zeros also changes the
   estimand, conditioning on being cited), and without the last year. That year, k = 9, has only 10
   article-years (8 non-sharing, 2 sharing: the 2016 cohort); it is kept in the fit and in the figure (the
-  figure has no minimum-n cutoff, its n labels show how thin the tail is), since the reviewer asked not to
+  figure has no minimum-n cutoff, its inset table of article counts shows how thin the tail is), since the reviewer asked not to
   trim the sample. **Robustness #2 (family).** The winner (and a near-tied g(k), if any) as a raw Gaussian,
   Poisson and NB, each with the same fallback. `glmer.nb` estimates theta once, for the winner with random
   intercepts (about three minutes, the only slow fit), and `fit_glmm(theta=...)` holds it fixed for the
@@ -472,7 +472,7 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   random intercepts only all four are also significant (p = 0.002 to 0.008) and the SE is about 18% smaller
   (0.032 vs. 0.040), which is what the slope corrects. **The effect sits at the edge of significance (p
   about 0.02 to 0.05 across specifications), so the manuscript must not present it as robust or noteworthy
-  beyond that.** The figure shows predicted mean citations per year for a typical article (with the raw observed means as open circles,
+  beyond that.** The figure shows predicted mean citations per year for a typical article (with the raw observed means as open markers: circles for sharing, squares for non-sharing; the predictions are filled,
   `SHOW_OBSERVED_MEANS`; they are unadjusted, the curves are adjusted), back-transformed
   from `log(1 + y)` as `exp(prediction + variance / 2) - 1` with the model's total random variance (the
   lognormal correction; without it the curves are geometric means, about 1 citation too low). Over k = 1 to
