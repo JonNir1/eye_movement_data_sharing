@@ -40,8 +40,8 @@ def save_figure(
 PLOT_WIDTH = 800                    # px
 ROW_HEIGHT, HEADER_HEIGHT = 20, 30  # px of the table of counts (plotly renders a header row no thinner than 30)
 TOP_MARGIN, X_AXIS_SPACE = 60, 40   # px above the plot and below it (tick labels and title), to size the table in plot fractions
-LEGEND_TITLE_CHARACTER_WIDTH = 5.5  # px per character of a bold 14 px legend title (an estimate: only the longest title sets the column)
-LEGEND_TITLE_GAP = 22               # px between the title column and the entries
+LEGEND_TITLE_CHARACTER_WIDTH = 7.0  # px per character of a bold 14 px legend title (an estimate: only the longest title sets the column)
+LEGEND_TITLE_GAP = 14               # px between the title column and the entries
 LEGEND_ROW_CENTRE = 14              # px from a legend's top edge to the vertical centre of its entries
 
 
