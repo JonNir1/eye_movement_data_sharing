@@ -26,8 +26,8 @@ class TestPlotCitationDynamics:
     def test_two_groups_draw_predictions_observed_means_and_a_table(self):
         fig = plot_citation_dynamics([make_group("Sharing", 0.5), make_group("Non-Sharing", 0.0, "square")], "title")
         assert count_traces(fig, go.Scatter) == 4 and count_traces(fig, go.Table) == 1
-        assert fig.layout.legend.title.text.startswith("<b>Sharing:</b>")
-        assert fig.layout.legend2.title.text == "<b>Non-Sharing:</b>"
+        assert [annotation.text for annotation in fig.layout.annotations] == ["<b>Sharing:</b>", "<b>Non-Sharing:</b>"]
+        assert fig.layout.legend.y > fig.layout.legend2.y
 
     def test_the_toggles_remove_their_parts(self):
         groups = [make_group("Sharing", 0.5), make_group("Non-Sharing", 0.0)]
@@ -41,7 +41,7 @@ class TestPlotCitationDynamics:
     def test_a_third_group_gets_its_own_legend_row_and_table_row(self):
         groups = [make_group("Participant", 0.5), make_group("Trial", 0.0, "square"), make_group("Fixation", -0.5, "diamond")]
         fig = plot_citation_dynamics(groups, "title")
-        assert fig.layout.legend3.title.text.startswith("<b>Fixation:</b>")
+        assert fig.layout.annotations[2].text == "<b>Fixation:</b>"
         assert fig.layout.legend.y > fig.layout.legend2.y > fig.layout.legend3.y
         table = next(trace for trace in fig.data if isinstance(trace, go.Table))
         assert list(table.cells.values[0]) == ["Participant", "Trial", "Fixation"]
@@ -64,13 +64,24 @@ class TestPlotCitationDynamics:
         table = next(trace for trace in fig.data if isinstance(trace, go.Table))
         assert 0 < table.domain.x[0] < table.domain.x[1] <= 1
 
-    def test_reserved_table_space_extends_the_y_axis_below_zero_without_negative_ticks(self):
+    def test_the_table_can_sit_in_the_bottom_left_corner(self):
         groups = [make_group("Sharing", 0.5), make_group("Non-Sharing", 0.0)]
-        plain = plot_citation_dynamics(groups, "title")
-        reserved = plot_citation_dynamics(groups, "title", reserve_table_space=True)
-        assert plain.layout.yaxis.range is None
-        low, high = reserved.layout.yaxis.range
-        assert low < 0 < high and min(reserved.layout.yaxis.tickvals) == 0
-        assert high > max(float(group.predictions["sem_high"].max()) for group in groups)
-        no_table = plot_citation_dynamics(groups, "title", show_counts=False, reserve_table_space=True)
-        assert no_table.layout.yaxis.range is None
+        right = next(trace for trace in plot_citation_dynamics(groups, "title").data if isinstance(trace, go.Table))
+        left = next(trace for trace in plot_citation_dynamics(groups, "title", table_corner="left").data if isinstance(trace, go.Table))
+        assert left.domain.x[0] < right.domain.x[0] and left.domain.x[0] > 0
+        assert left.domain.x[1] - left.domain.x[0] == right.domain.x[1] - right.domain.x[0]
+        assert left.domain.y == right.domain.y and left.domain.y[0] == 0
+
+    def test_the_y_axis_starts_at_zero_and_clears_the_highest_error_bar(self):
+        groups = [make_group("Sharing", 0.5), make_group("Non-Sharing", 0.0)]
+        low, high = plot_citation_dynamics(groups, "title").layout.yaxis.range
+        assert low == 0
+        assert high > max((group.observed["mean"] + group.observed["sem"]).max() for group in groups)
+
+    def test_the_legend_titles_are_annotations_so_that_every_row_of_entries_starts_at_the_same_x(self):
+        groups = [make_group("Participant", 0.5), make_group("Trial", 0.0, "square"), make_group("Fixation", -0.5, "diamond")]
+        layout = plot_citation_dynamics(groups, "title").layout
+        assert [annotation.text for annotation in layout.annotations] == ["<b>Participant:</b>", "<b>Trial:</b>", "<b>Fixation:</b>"]
+        assert len({annotation.x for annotation in layout.annotations}) == 1
+        assert len({layout.legend.x, layout.legend2.x, layout.legend3.x}) == 1
+        assert layout.legend.x > layout.annotations[0].x
