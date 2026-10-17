@@ -314,8 +314,9 @@ rediscovered or lost. Nothing here is written yet.
   (0.148 after FDR), and with Model 3 p = 0.073. Trial's apparent dip is largely its two imputed zeros:
   excluding them moves it from 0.753 to 0.915. At N = 23 to 31 the intervals span roughly 0.5 to 2.0
   on the FWCI scale, so the honest statement is that the data cannot locate any class relative to
-  the field, not that the classes match it. These granularity numbers were re-derived with the same
-  calculation (ad hoc, on the granularity models of nb 08); they have no notebook cell yet.
+  the field, not that the classes match it. The granularity numbers are the last cells of nb 08's
+  sharing granularity section (`gran_field_average`, the same functions, with Benjamini-Hochberg across the
+  three classes within each block: the smallest adjusted p_FDR is 0.231).
 
 - **Robustness, with a pointer to the code.** One sentence that the findings hold across model
   specifications (with and without venue, as fixed effect, as random intercept, or both) and across
@@ -498,9 +499,10 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   the interaction explains essentially no extra variance. Agreement across the candidates: all four negative and
   significant (`k + k^2` p = 0.026, `log(k)` p = 0.032, linear `k` b = -0.078 per SD, p = 0.0465). With
   random intercepts only all four are also significant (p = 0.002 to 0.008) and the SE is about 18% smaller
-  (0.032 vs. 0.040), which is what the slope corrects. **The effect sits at the edge of significance (p
-  about 0.02 to 0.05 across specifications), so the manuscript must not present it as robust or noteworthy
-  beyond that.** The figure shows predicted mean citations per year for a typical article (with the raw observed means as open markers: circles for sharing, squares for non-sharing; the predictions are filled,
+  (0.032 vs. 0.040), which is what the slope corrects. **Every specification gives p < 0.05 (about 0.02 to
+  0.05), and the author's rule is that an effect that is significant in all the refits survived them, so the
+  manuscript reports it as significant, with b, CI and p.** It is a small effect (about -4.5% per year, and no
+  gain in marginal R2), which the text should not inflate. The figure shows predicted mean citations per year for a typical article (with the raw observed means as open markers: circles for sharing, squares for non-sharing; the predictions are filled,
   `SHOW_OBSERVED_MEANS`; they are unadjusted, the curves are adjusted), back-transformed
   from `log(1 + y)` as `exp(prediction + variance / 2) - 1` with the model's total random variance (the
   lognormal correction; without it the curves are geometric means, about 1 citation too low). Over k = 1 to
