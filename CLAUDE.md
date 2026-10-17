@@ -190,7 +190,7 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   show how much the slope matters).
 
   **Selection and interpretation.** ML AIC (comparable across different fixed effects). The lowest AIC wins;
-  candidates within 2 AIC of it are reported as near-ties (with Akaike weights) and the first one is carried
+  candidates within 5 AIC of it (`RUNNER_UP_THRESHOLD` in nb 10) are reported as near-ties (with Akaike weights) and the first one is carried
   into the family robustness check. This replaces the earlier "simplest unless better by 2" rule. Then: the
   share of candidates with a significant interaction of the winner's sign (a consistency check, not
   independent evidence, since they share the data, and the winner's p ignores that it was picked from four),
