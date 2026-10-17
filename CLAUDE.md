@@ -190,7 +190,7 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   show how much the slope matters).
 
   **Selection and interpretation.** ML AIC (comparable across different fixed effects). The lowest AIC wins;
-  candidates within 2 AIC of it are reported as near-ties (with Akaike weights) and the first one is carried
+  candidates within 5 AIC of it (`RUNNER_UP_THRESHOLD` in nb 10) are reported as near-ties (with Akaike weights) and the first one is carried
   into the family robustness check. This replaces the earlier "simplest unless better by 2" rule. Then: the
   share of candidates with a significant interaction of the winner's sign (a consistency check, not
   independent evidence, since they share the data, and the winner's p ignores that it was picked from four),
@@ -314,8 +314,9 @@ rediscovered or lost. Nothing here is written yet.
   (0.148 after FDR), and with Model 3 p = 0.073. Trial's apparent dip is largely its two imputed zeros:
   excluding them moves it from 0.753 to 0.915. At N = 23 to 31 the intervals span roughly 0.5 to 2.0
   on the FWCI scale, so the honest statement is that the data cannot locate any class relative to
-  the field, not that the classes match it. These granularity numbers were re-derived with the same
-  calculation (ad hoc, on the granularity models of nb 08); they have no notebook cell yet.
+  the field, not that the classes match it. The granularity numbers are the last cells of nb 08's
+  sharing granularity section (`gran_field_average`, the same functions, with Benjamini-Hochberg across the
+  three classes within each block: the smallest adjusted p_FDR is 0.231).
 
 - **Robustness, with a pointer to the code.** One sentence that the findings hold across model
   specifications (with and without venue, as fixed effect, as random intercept, or both) and across
@@ -370,9 +371,13 @@ python -m nbconvert --to notebook --execute --inplace --ExecutePreprocessor.time
 ```
 
 Order does not matter, since each notebook runs standalone from a cold kernel. One caveat:
-notebooks 07, 08 and 10 call `fig.show()` with the renderer set to `"browser"`, which opens a tab
-per figure. For an unattended run, put a `sitecustomize.py` that no-ops `webbrowser.open` on
-`PYTHONPATH` rather than editing the notebooks.
+notebooks 07, 08 and 10 end their live analysis with a deliberate `1/0` guard cell, above the
+superseded v1 tail, so a batch run of them stops there with a `ZeroDivisionError` (everything above
+the guard is the current analysis; pass `--allow-errors` to run past it, or drop the guard cell). Every
+live `fig.show()` sits behind `if False:`, so no browser tab opens; the unconditional ones are all in
+the superseded tails below the guard. Only if the guard is dropped do those open a tab per figure
+(the renderer is `"browser"`), and then an unattended run needs a `sitecustomize.py` that no-ops
+`webbrowser.open` on `PYTHONPATH` rather than editing the notebooks.
 
 Figure exports are individually gated behind `if False:` blocks calling `save_figure()`; flip the one figure you want to re-export.
 
@@ -498,9 +503,10 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   the interaction explains essentially no extra variance. Agreement across the candidates: all four negative and
   significant (`k + k^2` p = 0.026, `log(k)` p = 0.032, linear `k` b = -0.078 per SD, p = 0.0465). With
   random intercepts only all four are also significant (p = 0.002 to 0.008) and the SE is about 18% smaller
-  (0.032 vs. 0.040), which is what the slope corrects. **The effect sits at the edge of significance (p
-  about 0.02 to 0.05 across specifications), so the manuscript must not present it as robust or noteworthy
-  beyond that.** The figure shows predicted mean citations per year for a typical article (with the raw observed means as open markers: circles for sharing, squares for non-sharing; the predictions are filled,
+  (0.032 vs. 0.040), which is what the slope corrects. **Every specification gives p < 0.05 (about 0.02 to
+  0.05), and the author's rule is that an effect that is significant in all the refits survived them, so the
+  manuscript reports it as significant, with b, CI and p.** It is a small effect (about -4.5% per year, and no
+  gain in marginal R2), which the text should not inflate. The figure shows predicted mean citations per year for a typical article (with the raw observed means as open markers: circles for sharing, squares for non-sharing; the predictions are filled,
   `SHOW_OBSERVED_MEANS`; they are unadjusted, the curves are adjusted), back-transformed
   from `log(1 + y)` as `exp(prediction + variance / 2) - 1` with the model's total random variance (the
   lognormal correction; without it the curves are geometric means, about 1 citation too low). Over k = 1 to
