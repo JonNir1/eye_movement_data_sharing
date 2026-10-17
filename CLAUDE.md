@@ -291,12 +291,16 @@ rediscovered or lost. Nothing here is written yet.
   It is the one absolute benchmark in the paper, and the contrast between groups throws it away.
   Unadjusted, non-sharers sit *below* field average at a geometric mean of 0.827 (95% CI 0.703 to
   0.973, p = 0.022) and sharers sit *at* it, 1.047 (0.825 to 1.330, p = 0.70). Adjusted (Model 3
-  marginal means at covariate means) neither differs from 1: 0.870 (p = 0.22) and 0.930 (p = 0.61).
-  That asymmetry is the same story the rest of the paper tells, with the apparent FWCI advantage
-  being covariate structure rather than sharing.
+  marginal means at covariate means) neither differs from 1: 0.870 (0.698 to 1.085, p = 0.22) and
+  0.930 (0.704 to 1.228, p = 0.61). That asymmetry is the same story the rest of the paper tells,
+  with the apparent FWCI advantage being covariate structure rather than sharing. The code is the
+  last cells of nb 08's sharing vs. non-sharing section (`field_average`): the unadjusted rows are
+  one-sample *t*-tests of `log(Imputed FWCI)` against 0, the adjusted rows Wald tests (z) of Model
+  3's prediction for each group with every covariate at its mean. All of these numbers were
+  re-derived from a fresh run of that table.
 
   Two caveats, both of which have to be stated if this is used. The five imputed FWCI zeros sit at
-  log -2.3 to -3.0 against a median log-FWCI of exactly 0, so each is worth about three articles'
+  log -2.3 to -3.0 against a median log-FWCI of -0.02 (about 0), so each is worth about three articles'
   deviation, and they pull a test against a fixed reference in a way they do not pull a
   between-group contrast, where they partly cancel: dropping them moves non-sharers from 0.827 to
   0.869 and p from 0.022 to 0.077. And "field average" is OpenAlex's field assignment, which is
@@ -305,10 +309,13 @@ rediscovered or lost. Nothing here is written yet.
 
   By granularity nothing differs from 1, before or after adjustment (unadjusted 1.128 / 0.753 /
   1.308 for participant / trial / fixation, adjusted 0.875 / 0.862 / 1.409, nothing surviving FDR,
-  fixation closest at p = 0.077 adjusted). Trial's apparent dip is largely its two imputed zeros:
+  fixation closest at p = 0.077 adjusted). Adjusted here is the granularity models' Model 1 (OLS), as
+  everywhere in the granularity analyses; with Model 0's clustered SEs fixation reaches p = 0.049
+  (0.148 after FDR), and with Model 3 p = 0.073. Trial's apparent dip is largely its two imputed zeros:
   excluding them moves it from 0.753 to 0.915. At N = 23 to 31 the intervals span roughly 0.5 to 2.0
   on the FWCI scale, so the honest statement is that the data cannot locate any class relative to
-  the field, not that the classes match it.
+  the field, not that the classes match it. These granularity numbers were re-derived with the same
+  calculation (ad hoc, on the granularity models of nb 08); they have no notebook cell yet.
 
 - **Robustness, with a pointer to the code.** One sentence that the findings hold across model
   specifications (with and without venue, as fixed effect, as random intercept, or both) and across
