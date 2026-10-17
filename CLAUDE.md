@@ -526,9 +526,10 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   its random-intercept estimate did **not** converge (or was singular) with the full structure and fell back
   to random intercepts (rate ratio 0.861, p = 0.0004, AIC 5550.7): that p is not comparable (its SE is 0.042
   against 0.062 for the Poisson, the understatement the random slope exists to remove), and its AIC is not
-  comparable with the Poisson's. The Poisson overdispersion ratio was 0.76 with the full structure in an
-  earlier run (categorical publication year; not printed now, because the NB fell back) and 1.05 with random
-  intercepts, where NB beat Poisson on AIC (5574.3 vs. 5636.7).
+  comparable with the Poisson's. The Poisson overdispersion ratio is 0.75 with the full structure (the
+  family cell prints it before the AIC comparison, which is skipped when the structures differ), i.e. no
+  overdispersion once the random slope is in; it was 1.05 with random intercepts in an earlier run, where NB
+  beat Poisson on AIC (5574.3 vs. 5636.7).
 - **Citation dynamics** (v1, superseded, nb 10): significant cumulative advantage in Years 1-4, marginal in 5-7,
   null by Year 8. Citation *velocity* differs only in Year 1 — read as early visibility
   rather than a sustained rate difference. Attrition caveat: N = 234 at Year 1 falls to
