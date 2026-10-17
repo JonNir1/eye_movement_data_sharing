@@ -371,9 +371,13 @@ python -m nbconvert --to notebook --execute --inplace --ExecutePreprocessor.time
 ```
 
 Order does not matter, since each notebook runs standalone from a cold kernel. One caveat:
-notebooks 07, 08 and 10 call `fig.show()` with the renderer set to `"browser"`, which opens a tab
-per figure. For an unattended run, put a `sitecustomize.py` that no-ops `webbrowser.open` on
-`PYTHONPATH` rather than editing the notebooks.
+notebooks 07, 08 and 10 end their live analysis with a deliberate `1/0` guard cell, above the
+superseded v1 tail, so a batch run of them stops there with a `ZeroDivisionError` (everything above
+the guard is the current analysis; pass `--allow-errors` to run past it, or drop the guard cell). Every
+live `fig.show()` sits behind `if False:`, so no browser tab opens; the unconditional ones are all in
+the superseded tails below the guard. Only if the guard is dropped do those open a tab per figure
+(the renderer is `"browser"`), and then an unattended run needs a `sitecustomize.py` that no-ops
+`webbrowser.open` on `PYTHONPATH` rather than editing the notebooks.
 
 Figure exports are individually gated behind `if False:` blocks calling `save_figure()`; flip the one figure you want to re-export.
 
