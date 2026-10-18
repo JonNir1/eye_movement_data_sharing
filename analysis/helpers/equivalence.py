@@ -27,6 +27,7 @@ from helpers.config import R_LIBRARY_DIR
 from helpers.r_models import find_rscript
 
 ALPHA = 0.05
+LOG_BOUND = 0.3         # smallest effect of interest on a log outcome: a geometric-mean ratio of 0.74 to 1.35
 R_SCRIPT = Path(__file__).with_name("equivalence.R")
 PRIOR_SCALES = ("medium", "wide", "ultrawide")      # BayesFactor's names; the default JZS scale is "medium" (sqrt(2) / 2)
 _T_TEST_SCALES = {"medium": np.sqrt(2) / 2, "wide": 1.0, "ultrawide": np.sqrt(2)}
@@ -129,6 +130,16 @@ def tost_from_estimate(
     return EquivalenceResult(
         test=test, estimate=estimate, ci_low=estimate - margin, ci_high=estimate + margin, low=low, high=high,
         p_lower=float(reference.sf((estimate - low) / se)), p_upper=float(reference.cdf((estimate - high) / se)), alpha=alpha,
+    )
+
+
+def tost_coefficient(result: Any, term: str, bound: float = LOG_BOUND, alpha: float = ALPHA) -> EquivalenceResult:
+    """The TOST of one coefficient of a fitted statsmodels model within +-`bound`, with the reference distribution the
+    model's own tests use: t on the residual (or, with cluster-robust SEs, the cluster) degrees of freedom for OLS, the
+    normal for a mixed model."""
+    df = getattr(result, "df_resid_inference", result.df_resid) if getattr(result, "use_t", False) else None
+    return tost_from_estimate(
+        float(result.params[term]), float(result.bse[term]), -bound, bound, df, alpha, test=f"TOST of {term}",
     )
 
 

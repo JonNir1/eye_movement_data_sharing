@@ -4,14 +4,15 @@ import numpy as np
 import pandas as pd
 import pingouin as pg
 import pytest
+import statsmodels.formula.api as smf
 from scipy import stats
 from statsmodels.stats.proportion import tost_proportions_2indep
 from statsmodels.stats.weightstats import ttost_ind
 
 from helpers.config import R_LIBRARY_DIR
 from helpers.equivalence import (
-    BayesFactor, bf_contingency, bf_term, bf_ttest, describe_bf, sensitivity, tost_from_estimate, tost_odds_ratio,
-    tost_two_samples,
+    LOG_BOUND, BayesFactor, bf_contingency, bf_term, bf_ttest, describe_bf, sensitivity, tost_coefficient, tost_from_estimate,
+    tost_odds_ratio, tost_two_samples,
 )
 from helpers.r_models import find_rscript
 
@@ -80,6 +81,42 @@ class TestTostFromEstimate:
         row = tost_from_estimate(0.0, 0.1, -0.3, 0.3).as_row()
         assert {"estimate", "90% CI low", "90% CI high", "bound", "p_TOST", "outcome", "smallest bound"} <= set(row)
         assert row["bound"] == "±0.3"
+
+
+class TestTostCoefficient:
+    @staticmethod
+    def venue_data(seed: int = 0) -> pd.DataFrame:
+        rng = np.random.default_rng(seed)
+        venue = rng.integers(0, 12, 120)
+        x = rng.normal(size=120)
+        return pd.DataFrame({"y": 0.1 * x + rng.normal(0, 0.4, 12)[venue] + rng.normal(size=120), "x": x, "venue": venue})
+
+    @pytest.mark.filterwarnings("ignore::statsmodels.tools.sm_exceptions.ConvergenceWarning")
+    @pytest.mark.parametrize("fit", ["ols", "cluster", "mixed"])
+    def test_the_interval_is_the_models_own_90_percent_interval(self, fit):
+        data = self.venue_data()
+        if fit == "mixed":
+            result = smf.mixedlm("y ~ x", data, groups=data["venue"]).fit(reml=True)
+        elif fit == "cluster":
+            result = smf.ols("y ~ x", data).fit(cov_type="cluster", cov_kwds={"groups": data["venue"], "use_correction": True}, use_t=True)
+        else:
+            result = smf.ols("y ~ x", data).fit()
+        tost = tost_coefficient(result, "x", bound=0.3)
+        assert (tost.ci_low, tost.ci_high) == pytest.approx(tuple(result.conf_int(alpha=0.10).loc["x"]))
+        assert tost.equivalent == (tost.ci_low > -0.3 and tost.ci_high < 0.3)
+        assert tost.estimate == pytest.approx(result.params["x"])
+
+    def test_cluster_robust_standard_errors_use_the_cluster_degrees_of_freedom(self):
+        data = self.venue_data()
+        clustered = smf.ols("y ~ x", data).fit(cov_type="cluster", cov_kwds={"groups": data["venue"], "use_correction": True}, use_t=True)
+        plain = smf.ols("y ~ x", data).fit()
+        expected = stats.t(clustered.df_resid_inference).ppf(0.95) * clustered.bse["x"]
+        assert tost_coefficient(clustered, "x").ci_high - clustered.params["x"] == pytest.approx(expected)
+        assert tost_coefficient(plain, "x").ci_high - plain.params["x"] == pytest.approx(stats.t(plain.df_resid).ppf(0.95) * plain.bse["x"])
+
+    def test_the_default_bound_is_the_project_wide_one(self):
+        result = smf.ols("y ~ x", self.venue_data()).fit()
+        assert (tost_coefficient(result, "x").low, tost_coefficient(result, "x").high) == (-LOG_BOUND, LOG_BOUND)
 
 
 class TestTostOddsRatio:
