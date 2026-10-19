@@ -16,7 +16,10 @@ def _r_is_available() -> bool:
     return (R_LIBRARY_DIR / "lme4").exists()
 
 
-pytestmark = pytest.mark.skipif(not _r_is_available(), reason="Rscript or the lme4 package is not available")
+pytestmark = [
+    pytest.mark.slow,
+    pytest.mark.skipif(not _r_is_available(), reason="Rscript or the lme4 package is not available"),
+]
 
 TRUE_SLOPE = 0.3
 

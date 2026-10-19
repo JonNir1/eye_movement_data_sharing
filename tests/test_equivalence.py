@@ -160,6 +160,7 @@ class TestDescribeBf:
 
 
 @requires_r
+@pytest.mark.slow
 class TestTostTwoSamples:
     def test_welch_matches_statsmodels(self):
         x, y = two_samples()
@@ -202,6 +203,7 @@ class TestTostTwoSamples:
 
 
 @requires_r
+@pytest.mark.slow
 class TestBayesFactors:
     def test_two_sided_ttest_matches_pingouin(self):
         x, y = two_samples(seed=2, shift=0.35)
