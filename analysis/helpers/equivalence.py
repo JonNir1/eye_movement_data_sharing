@@ -5,7 +5,7 @@ effect of interest (it rejects two one-sided nulls, "the effect is at least `low
 above it"), and a Bayes factor asks how much more likely the data are under no effect than under some effect.
 Which of the two a notebook uses, and the bounds, are decided in `CLAUDE.md`.
 
-The two-sample TOSTs and the Bayes factors run in R (`TOSTER`, `BayesFactor`) through the same subprocess and JSON
+The two-sample TOSTs and the Bayes factors run in R (`TOSTER`, `BayesFactor`, `bayesplay`) through the same subprocess and JSON
 bridge as `helpers.r_models`, with `helpers/equivalence.R`. The odds-ratio TOST is `statsmodels`', and the TOST of a
 coefficient is the two one-sided tests computed from its estimate and standard error.
 """
@@ -137,10 +137,16 @@ def tost_coefficient(result: Any, term: str, bound: float = LOG_BOUND, alpha: fl
     """The TOST of one coefficient of a fitted statsmodels model within +-`bound`, with the reference distribution the
     model's own tests use: t on the residual (or, with cluster-robust SEs, the cluster) degrees of freedom for OLS, the
     normal for a mixed model."""
-    df = getattr(result, "df_resid_inference", result.df_resid) if getattr(result, "use_t", False) else None
     return tost_from_estimate(
-        float(result.params[term]), float(result.bse[term]), -bound, bound, df, alpha, test=f"TOST of {term}",
+        float(result.params[term]), float(result.bse[term]), -bound, bound, _reference_df(result), alpha, test=f"TOST of {term}",
     )
+
+
+def _reference_df(result: Any) -> Optional[float]:
+    """The degrees of freedom of the t reference a fitted statsmodels model uses for its coefficients, or None for the normal."""
+    if not getattr(result, "use_t", False):
+        return None
+    return getattr(result, "df_resid_inference", result.df_resid)
 
 
 def _pooled_sd(x: np.ndarray, y: np.ndarray) -> float:
@@ -214,6 +220,24 @@ def bf_contingency(table: Sequence[Sequence[int]], fixed_margin: Literal["rows",
     return BayesFactor(out["bf10"], f"contingency table, {fixed_margin} fixed, association vs independence", out["error"])
 
 
+def bf_from_estimate(estimate: float, se: float, prior_sd: float = LOG_BOUND, df: Optional[float] = None) -> BayesFactor:
+    """Bayes factor for a coefficient (or a contrast, or a mean) from its estimate and standard error (`bayesplay`; Dienes
+    & Mclatchie, 2018): the estimate is normal around the true effect with the given SE (a Student-t on `df` degrees of
+    freedom when `df` is given), H0 is no effect, and H1 puts a normal prior of SD `prior_sd` centred at zero on the effect.
+
+    The prior is in the units of the estimate (log units for the models of notebooks 7, 8, 10 and 12), and is the substantive
+    choice: `prior_sd` is the typical effect size H1 expects. The same estimate and SE give a larger BF01 under a wider prior.
+    """
+    out = _run_r({"op": "bf_summary", "estimate": float(estimate), "se": float(se), "df": df, "prior_sd": float(prior_sd)})
+    likelihood = "normal" if df is None else f"t({df:.3g})"
+    return BayesFactor(out["bf10"], f"{likelihood} likelihood, N(0, {prior_sd:.3g}) prior on the effect")
+
+
+def bf_coefficient(result: Any, term: str, prior_sd: float = LOG_BOUND) -> BayesFactor:
+    """`bf_from_estimate` for one coefficient of a fitted statsmodels model, with the reference distribution its own tests use."""
+    return bf_from_estimate(float(result.params[term]), float(result.bse[term]), prior_sd, _reference_df(result))
+
+
 def bf_term(
         data: pd.DataFrame, formula_full: str, formula_null: str, random: Sequence[str] = (), factors: Sequence[str] = (),
         scale_fixed: str | float = "medium", scale_continuous: str | float = "medium", iterations: int = 100_000, seed: int = 1,
@@ -236,8 +260,9 @@ def bf_term(
     return BayesFactor(out["bf10"], f"lmBF `{formula_full}` vs `{formula_null}`, fixed scale {scale_fixed}", out["error"])
 
 
-def sensitivity(compute: Callable[[str], BayesFactor], scales: Sequence[str] = PRIOR_SCALES) -> pd.DataFrame:
-    """A Bayes factor across prior scales, as a table: `compute` takes the scale name and returns the Bayes factor."""
+def sensitivity(compute: Callable[[Any], BayesFactor], scales: Sequence[Any] = PRIOR_SCALES) -> pd.DataFrame:
+    """A Bayes factor across prior scales, as a table: `compute` takes a scale (a BayesFactor preset name, or a prior SD for
+    `bf_from_estimate`) and returns the Bayes factor."""
     return pd.DataFrame({scale: compute(scale).as_row() for scale in scales}).T.rename_axis("prior scale")
 
 

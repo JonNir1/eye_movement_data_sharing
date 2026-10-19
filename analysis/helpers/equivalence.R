@@ -7,12 +7,14 @@
 #   tost_wilcox   x, y, low, high, alpha                     the same with the Wilcoxon-Mann-Whitney test (wilcox_TOST)
 #   bf_ttest      x, y, rscale, one_sided (null, "greater" or "less")      JZS Bayes factor, BF10
 #   bf_contingency table (rows x columns), fixed_margin                    BF10 of association vs independence
+#   bf_summary    estimate, se, df (null for the normal), prior_sd     BF10 of a coefficient from its estimate and SE (bayesplay)
 #   bf_term       data (CSV path), factors, formula_full, formula_null, random, rscale_fixed, rscale_cont, iterations, seed
 #                 BF10 of the term the full formula has and the null formula lacks (lmBF; random = random factors)
 
 suppressPackageStartupMessages({
   library(TOSTER)
   library(BayesFactor)
+  library(bayesplay)
   library(jsonlite)
 })
 
@@ -57,6 +59,16 @@ run_job <- function(job) {
     bf_contingency = {
       bf <- contingencyTableBF(as.matrix(job$table), sampleType = "indepMulti", fixedMargin = job$fixed_margin)
       bayes_factor_summary(bf)
+    },
+    bf_summary = {
+      observed <- if (is.null(job$df)) {
+        likelihood(family = "normal", mean = job$estimate, sd = job$se)
+      } else {
+        likelihood(family = "student_t", mean = job$estimate, sd = job$se, df = job$df)
+      }
+      alternative <- prior(family = "normal", mean = 0, sd = job$prior_sd)
+      null <- prior(family = "point", point = 0)
+      list(bf10 = as.numeric(integral(observed * alternative) / integral(observed * null)), error = NULL)
     },
     bf_term = {
       data <- read.csv(job$data, stringsAsFactors = FALSE)

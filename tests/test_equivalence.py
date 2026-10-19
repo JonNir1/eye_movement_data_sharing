@@ -5,14 +5,14 @@ import pandas as pd
 import pingouin as pg
 import pytest
 import statsmodels.formula.api as smf
-from scipy import stats
+from scipy import integrate, stats
 from statsmodels.stats.proportion import tost_proportions_2indep
 from statsmodels.stats.weightstats import ttost_ind
 
 from helpers.config import R_LIBRARY_DIR
 from helpers.equivalence import (
-    LOG_BOUND, BayesFactor, bf_contingency, bf_term, bf_ttest, describe_bf, sensitivity, tost_coefficient, tost_from_estimate,
-    tost_odds_ratio, tost_two_samples,
+    LOG_BOUND, BayesFactor, bf_coefficient, bf_contingency, bf_from_estimate, bf_term, bf_ttest, describe_bf, sensitivity,
+    tost_coefficient, tost_from_estimate, tost_odds_ratio, tost_two_samples,
 )
 from helpers.r_models import find_rscript
 
@@ -22,10 +22,10 @@ def _r_tools_are_available() -> bool:
         find_rscript()
     except FileNotFoundError:
         return False
-    return all((R_LIBRARY_DIR / package).exists() for package in ("TOSTER", "BayesFactor"))
+    return all((R_LIBRARY_DIR / package).exists() for package in ("TOSTER", "BayesFactor", "bayesplay"))
 
 
-requires_r = pytest.mark.skipif(not _r_tools_are_available(), reason="Rscript, TOSTER or BayesFactor is not available")
+requires_r = pytest.mark.skipif(not _r_tools_are_available(), reason="Rscript, TOSTER, BayesFactor or bayesplay is not available")
 
 
 def two_samples(seed: int = 0, shift: float = 0.1) -> tuple[np.ndarray, np.ndarray]:
@@ -253,6 +253,38 @@ class TestBayesFactors:
     def test_a_model_without_random_factors_runs(self):
         result = bf_term(self.venue_data(0.6), "y ~ sharing + x", "y ~ x", factors=["sharing"])
         assert result.bf10 > 10
+
+    def test_a_normal_likelihood_matches_the_closed_form(self):
+        estimate, se, tau = 0.0377, 0.1313, 0.3
+        expected = stats.norm.pdf(estimate, 0, np.hypot(se, tau)) / stats.norm.pdf(estimate, 0, se)
+        assert bf_from_estimate(estimate, se, tau).bf10 == pytest.approx(expected, rel=1e-4)
+
+    def test_a_t_likelihood_matches_numerical_integration(self):
+        estimate, se, df, tau = 0.137, 0.0946, 22, 0.3
+
+        def likelihood(effect: float) -> float:
+            return stats.t.pdf((estimate - effect) / se, df) / se
+
+        marginal = integrate.quad(lambda effect: likelihood(effect) * stats.norm.pdf(effect, 0, tau), -np.inf, np.inf)[0]
+        assert bf_from_estimate(estimate, se, tau, df).bf10 == pytest.approx(marginal / likelihood(0.0), rel=1e-4)
+
+    def test_no_effect_favours_the_null_more_under_a_wider_prior_and_a_clear_effect_favours_h1(self):
+        narrow, wide = bf_from_estimate(0.0, 0.1, 0.15), bf_from_estimate(0.0, 0.1, 0.6)
+        assert wide.bf01 > narrow.bf01 > 1
+        assert bf_from_estimate(0.5, 0.1, 0.3).bf10 > 100
+
+    def test_bf_coefficient_uses_the_reference_distribution_of_the_model(self):
+        rng = np.random.default_rng(3)
+        data = pd.DataFrame({"x": rng.normal(size=30)})
+        data["y"] = 0.2 * data["x"] + rng.normal(size=30)
+        result = smf.ols("y ~ x", data).fit()
+        expected = bf_from_estimate(result.params["x"], result.bse["x"], 0.3, df=result.df_resid)
+        assert bf_coefficient(result, "x", 0.3).bf10 == pytest.approx(expected.bf10)
+        assert bf_coefficient(result, "x", 0.3).bf10 != pytest.approx(bf_from_estimate(result.params["x"], result.bse["x"], 0.3).bf10, rel=1e-6)
+
+    def test_sensitivity_works_over_prior_sds(self):
+        table = sensitivity(lambda tau: bf_from_estimate(0.04, 0.13, tau), scales=(0.15, 0.3, 0.6))
+        assert list(table.index) == [0.15, 0.3, 0.6] and table["BF01"].is_monotonic_increasing
 
     def test_sensitivity_has_a_row_per_prior_scale(self):
         x, y = two_samples(seed=2)
