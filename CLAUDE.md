@@ -304,7 +304,13 @@ Still open:
 
 - **The Bayes factors need a sentence on the prior** in the Methods (Normal(0, 0.3) on the log scale for coefficients, JZS
   Cauchy for the t-tests), and the manuscript has to carry the result as it stands: the evidence for exactly no effect is
-  anecdotal under that prior (see the invariants), while the data exclude effects beyond about 35% for citation counts.
+  anecdotal under that prior (see the invariants), while the data exclude effects beyond about 35% for citation counts. Draft
+  Methods sentence: *Bayes factors for the sharing coefficient were computed from the coefficient and its standard error (a normal
+  likelihood, and a t on the cluster degrees of freedom for the cluster-robust model), with H0 an effect of exactly zero and H1 a
+  normal prior centred at zero with an SD of 0.3 on the log scale (the smallest effect of interest), repeated at other SDs (0.15 to
+  0.6) to show the dependence on the prior (Dienes & Mclatchie, 2018; bayesplay 0.9.3); the one-sided univariate comparison used the
+  default JZS Bayes factor (a Cauchy prior of scale sqrt(2)/2; Rouder et al., 2009; BayesFactor 0.9.12-4.8). We report BF01 with the
+  verbal labels of Lee and Wagenmakers (2013).*
 - **Why time is binned annually.** Worth one sentence in the manuscript, since the reviewer's page-6
   comment suggests expressing things in weeks: OpenAlex serves `counts_by_year`, so annual is the
   finest resolution the source supports. (The granularity version of the dynamics analysis is nb 11.)
