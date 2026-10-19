@@ -274,8 +274,9 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   **Where each goes.** TOST and BF: nb 07 and nb 08 (the sharing
   coefficient of Models 0-3, BF for Model 0 is n/a because of its cluster-robust SEs; nb 07's univariate null). TOST only: nb 01
   (census times, whose Mann-Whitney is significant), nb 05 (the three features not significant after FDR; their BFs were dropped,
-  see above), nb 08's field-average rows for sharing vs non-sharing, nb 10's sharing main
-  effect at the mean k (the null stated in the Figure 3 caption), nb 12's coefficient tables. BF only: the granularity omnibus tests
+  see above), nb 08's field-average rows for sharing vs non-sharing, nb 10's sharing
+  coefficient at the average time since publication (a conditional claim, not an overall effect: the interaction is significant and
+  the curves cross near that point; the null stated in the Figure 3 caption), nb 12's coefficient tables. BF only: the granularity omnibus tests
   (nb 07, 08: no TOST for an omnibus) and nb 08's Mann-Whitney (it is significant). **Decided against:** nb 05's granularity
   features (an omnibus, and 23 to 31 articles per class); nb 07/08 pairwise granularity contrasts (SE about 0.3); nb 08's class
   field-average rows (shown, all inconclusive); nb 10's interaction and robustness refits (significant); and **nb 11**, where no
@@ -621,8 +622,9 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   1.18, 1.92, 1.73, 2.03 (0.9 to 1.3 at SD 0.15, 2.0 to 3.7 at SD 0.6); the Mann-Whitney's one-sided JZS BF10 = 1.01 (0.76 and 0.56 at
   the wider scales; the *t*-test on the log scale has one-sided p = 0.050), i.e. **no evidence either way, not "weak support"**; against
   the field average (+-0.3): sharing articles are equivalent unadjusted (p = 0.019), non-sharing ones only without the imputed zeros
-  (p = 0.022), every other row, including all nine class rows, is inconclusive; granularity omnibus BF01 = 2.0 (error 2.9%). *nb 10:* the
-  sharing main effect at the mean k is equivalent within +-0.3 (0.010, 90% CI -0.14 to 0.16, p = 0.001). *nb 12:* citations, Model 0
+  (p = 0.022), every other row, including all nine class rows, is inconclusive; granularity omnibus BF01 = 2.0 (error 2.9%). *nb 10:* at
+  the average time since publication the groups are equivalent within +-0.3 (0.010, 90% CI -0.14 to 0.16, p = 0.001); say it that way
+  ("no difference at the average year, while the trajectories diverge"), also in the Figure 3 caption, not as "no effect of sharing". *nb 12:* citations, Model 0
   equivalent with the venue clustering (p = 0.0495) but not with the last-author (0.103) or two-way (0.061) clustering; ML Model 3
   equivalent with the venue (0.022) and venue + last-author (0.032) intercepts, inconclusive with the last author alone (0.0504); every
   FWCI row is inconclusive (0.064 to 0.16). Reading: for citation counts the data exclude effects beyond about 35%, but favour exactly no
