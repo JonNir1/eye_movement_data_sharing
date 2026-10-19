@@ -10,6 +10,7 @@ statistic the manuscript ends up quoting.
 import numpy as np
 import pandas as pd
 import pytest
+from scipy import stats
 import statsmodels.formula.api as smf
 from statsmodels.stats.multitest import multipletests
 
@@ -156,6 +157,40 @@ class TestBinaryComparison:
         out, _ = compare_binary(data=data, share_feature=SHARE_COL, tested_feature="Has Preprint")
         assert out["test"] == "Fisher's Exact"
         assert out["dof"] is None
+
+    def test_two_by_two_fisher_statistic_is_the_odds_ratio(self):
+        data = pd.DataFrame({
+            SHARE_COL: [0] * 10 + [1] * 4,
+            "Has Preprint": [0] * 9 + [1] + [0] * 3 + [1],
+        })
+        out, _ = compare_binary(data=data, share_feature=SHARE_COL, tested_feature="Has Preprint")
+        assert out["statistic"] == pytest.approx(out["effect_sizes"]["Odds Ratio"])
+
+    def test_r_by_c_fisher_names_its_statistic_and_is_reproducible(self):
+        # 3 x 2 with an expected frequency below 5: scipy's r x c statistic is the probability of the table
+        # (not an odds ratio) and its p-value is a Monte Carlo estimate, which must not change between calls
+        data = pd.DataFrame({
+            "Sharing Class": ["PPT"] * 10 + ["TRIAL"] * 10 + ["FIX"] * 10,
+            "Is Open Access": [1] * 10 + [1] * 9 + [0] + [1] * 6 + [0] * 4,
+        })
+        out, table = compare_binary(data=data, share_feature="Sharing Class", tested_feature="Is Open Access")
+        again, _ = compare_binary(data=data, share_feature="Sharing Class", tested_feature="Is Open Access")
+        assert out["test"] == "Fisher's Exact (statistic: table probability)"
+        assert out["statistic"] == pytest.approx(
+            stats.random_table(table.sum(axis=1), table.sum(axis=0)).pmf(table.to_numpy())
+        )
+        assert out["p_val"] == again["p_val"]
+        assert 0 < out["p_val"] < 1
+        assert set(out["effect_sizes"]) == {"Cramer V"}
+
+    def test_r_by_c_chi_squared_keeps_its_statistic(self):
+        data = pd.DataFrame({
+            "Sharing Class": ["NONE"] * 30 + ["TRIAL"] * 30 + ["FIXATION"] * 30,
+            "Has US Author": [0] * 20 + [1] * 10 + [0] * 15 + [1] * 15 + [0] * 10 + [1] * 20,
+        })
+        out, table = compare_binary(data=data, share_feature="Sharing Class", tested_feature="Has US Author")
+        assert out["test"] == "Chi-Squared"
+        assert out["statistic"] == pytest.approx(stats.chi2_contingency(table, correction=False).statistic)
 
     def test_two_by_two_reports_odds_ratio_and_phi(self):
         data = pd.DataFrame({
