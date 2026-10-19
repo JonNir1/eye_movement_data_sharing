@@ -420,6 +420,12 @@ the superseded tails below the guard. Only if the guard is dropped do those open
 
 Figure exports are individually gated behind `if False:` blocks calling `save_figure()`; flip the one figure you want to re-export.
 
+**Tests** run from the project root with the venv's interpreter: `./.venv/Scripts/python.exe -m pytest tests -q`. The 28 tests that
+start R subprocesses (`test_r_models.py` and the R-backed classes of `test_equivalence.py`) carry the `slow` marker, registered in
+`tests/conftest.py`: they take about 10 minutes in the main checkout (each R call loads its packages), against seconds for the rest,
+so `-m "not slow"` is the quick check while editing and the full run is for before a merge. They skip themselves when Rscript or a
+package is missing.
+
 **`data_store/Godwin_2025_metadata.csv` is a frozen OpenAlex snapshot and is gitignored.** Every
 reported number depends on it. The current snapshot was queried on **2026-09-02** (the manuscript
 should state this date, since a later query can return different counts).

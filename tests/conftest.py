@@ -9,8 +9,14 @@ the path in its own right for `tests/test_corpus.py`.
 import sys
 from pathlib import Path
 
+import pytest
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 for directory in (PROJECT_ROOT / "analysis", PROJECT_ROOT / "data"):
     if str(directory) not in sys.path:
         sys.path.insert(0, str(directory))
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    config.addinivalue_line("markers", "slow: starts R subprocesses (a few seconds each); skip with `-m \"not slow\"`")
