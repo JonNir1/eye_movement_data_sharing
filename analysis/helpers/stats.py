@@ -19,6 +19,10 @@ from statsmodels.stats.multitest import multipletests
 
 from helpers.config import BINARY_FEATURES
 
+# scipy's r x c Fisher's exact p-value is a Monte Carlo estimate: fixed so the reported p-value is reproducible
+FISHER_MONTE_CARLO_SEED = 0
+FISHER_MONTE_CARLO_RESAMPLES = 99_999
+
 
 def significance_class(q: float) -> Union[str, float]:
     """Star label for a (corrected) p-value: `***` < .001, `**` < .01, `*` < .05, else `n.s.`.
@@ -164,6 +168,13 @@ def compare_binary(
         tested_feature: str,
         verbose: bool = False
 ) -> tuple[dict, pd.DataFrame]:
+    """Compare a binary `tested_feature` across the groups of `share_feature`.
+
+    `statistic` is the chi-square statistic, or the sample odds ratio for a 2x2 Fisher's exact test. For an
+    r x c Fisher's exact test it is the probability of the observed table under independence (scipy's
+    statistic, not an odds ratio), which the `test` label says. That p-value is a Monte Carlo estimate
+    (about 0.003 error at 99,999 resamples), seeded so it is reproducible.
+    """
     assert share_feature in data.columns, f"dataset missing `{share_feature}` column"
     assert tested_feature in data.columns, f"dataset missing `{tested_feature}` column"
     assert tested_feature in BINARY_FEATURES, f"feature `{tested_feature}` is not binary, use `compare_contoniuous()`."
@@ -173,8 +184,12 @@ def compare_binary(
         test_name = "Chi-Squared"
         statistic, p_val, dof = res.statistic, res.pvalue, int(res.dof)
     else:
-        test_name = "Fisher's Exact"
-        fisher = stats.fisher_exact(contingency_table)
+        if contingency_table.shape == (2, 2):
+            test_name, fisher = "Fisher's Exact", stats.fisher_exact(contingency_table)
+        else:
+            test_name = "Fisher's Exact (statistic: table probability)"
+            fisher = stats.fisher_exact(contingency_table, method=stats.MonteCarloMethod(
+                n_resamples=FISHER_MONTE_CARLO_RESAMPLES, rng=np.random.default_rng(FISHER_MONTE_CARLO_SEED)))
         statistic, p_val, dof = fisher.statistic, fisher.pvalue, None
     effect_sizes = dict()
     if contingency_table.shape == (2, 2):
