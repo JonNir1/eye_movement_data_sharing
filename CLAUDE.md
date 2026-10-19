@@ -17,7 +17,7 @@ current in-progress revision; `brief report.pdf` is the version that was submitt
 
 ```
 data/       acquisition only - OpenAlex/CrossRef fetching, and _api_secrets.py
-analysis/   eleven notebooks, one per research question, plus helpers/
+analysis/   twelve notebooks, one per research question (the twelfth for ad-hoc checks), plus helpers/
 output/     exported figures
 data_store/ source data AND the derived parquet frames (gitignored)
 ```
@@ -60,9 +60,10 @@ between notebooks.
 | `09_results_figures` | The manuscript figures that summarize nb 07 and nb 08 together: sharing vs. non-sharing violins and the supplementary granularity bars |
 | `10_citation_dynamics` | When does the advantage appear, and does it persist? |
 | `11_granularity_dynamics` | Within the 80 sharing articles, do the three granularities differ in how their yearly citations change over time? |
+| `12_ad_hoc_analyses` | Would a choice the reported models make change the conclusion? (Not part of the analysis plan; nothing here is reported. Currently: last-author (lab) clustering.) |
 
 `analysis/helpers/` holds only code that two or more notebooks import (`config`, `dataset`,
-`stats`, `plotting`, `r_models`, `dynamics`). Single-notebook helpers stay inline on purpose. There is no
+`stats`, `plotting`, `r_models`, `dynamics`, `equivalence`). Single-notebook helpers stay inline on purpose. There is no
 `__init__.py` anywhere — these are namespace packages, and helper modules use absolute
 imports (`from helpers.config import ...`).
 
@@ -243,6 +244,41 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   chased. Robustness is compact: the three rungs, offsets 0.5 and 0.1, zeros dropped, `k >= 8` dropped and a
   Poisson; no age check and no negative binomial. The expectation that the maximal structure would be
   singular at this N was wrong: it converged without a singular fit, so it is the primary rung.
+- **Equivalence tests and Bayes factors (`helpers.equivalence`)** answer the reviewer's Bayesian request and replace
+  "not significant" with a statement about size: a TOST says the effect is inside a smallest effect of interest, a Bayes
+  factor says how much the data favour no effect over an effect. **"Not significant" is never written as
+  "equivalent".** Tools: `TOSTER` (two-sample TOST), `BayesFactor` (JZS t-tests, one-sided where the test was; contingency
+  tables; `lmBF`) and `bayesplay` (a coefficient from its estimate and SE), all R through `helpers/equivalence.R`; the
+  odds-ratio TOST is statsmodels'; the only hand-written test is `tost_from_estimate` / `tost_coefficient` (the two one-sided
+  tests from an estimate and SE, cross-validated against TOSTER and statsmodels in `tests/test_equivalence.py`).
+
+  **Bounds, set a priori:** +-0.3 on a log outcome (a ratio of 0.74 to 1.35; `LOG_BOUND`), +-0.5 pooled SD for a continuous
+  feature, an odds ratio between 1/2 and 2 for a binary one, +-7 days for the census times. The bound is a judgement, so every
+  TOST row also gives the 90% interval it is dual to and `smallest bound` (the narrowest bound that interval supports). Three
+  outcomes: equivalent, not equivalent (the interval lies wholly beyond a bound), inconclusive. With the SEs in this corpus (0.09
+  to 0.16 on the log scale) no sharing coefficient can be shown equivalent within about +-0.25, and the notebook's 0.1 SMD
+  imbalance flag can never be established at N = 80 / 154 (a 90% interval is at least +-0.23 SD wide).
+
+  **Bayes factors:** a coefficient from (estimate, SE) under a Normal(0, 0.3) prior on the effect (the same smallest effect as the
+  TOST), with half and twice that SD alongside; t-tests with the JZS Cauchy prior (scale sqrt(2)/2); omnibus class terms with
+  `lmBF` on Model 1. `lmBF` with a random venue factor is **not** used: it is Monte-Carlo noisy (nb 07 Model 3: BF01 between 3.7 and 6.7
+  across seeds and 10^5 to 10^6 iterations, its own error estimate between 0.05 and 0.38), whereas Model 1's error is about 1%. A
+  BF for a rank test does not exist off the shelf (the rank-based latent-normal factor of van Doorn et al., 2020 has no package), so
+  the nb 08 Mann-Whitney gets the one-sided JZS factor of the *t*-test on `log(imputed FWCI)`, labelled a parametric stand-in.
+  Verbal labels: Lee & Wagenmakers. Where the BF is large only under a wide prior, say so: the prior is the assumption.
+
+  **Where each goes.** TOST and BF: nb 05 (the three features not significant after FDR), nb 07 and nb 08 (the sharing
+  coefficient of Models 0-3, BF for Model 0 is n/a because of its cluster-robust SEs; nb 07's univariate null). TOST only: nb 01
+  (census times, whose Mann-Whitney is significant), nb 08's field-average rows for sharing vs non-sharing, nb 10's sharing main
+  effect at the mean k (the null stated in the Figure 3 caption), nb 12's coefficient tables. BF only: the granularity omnibus tests
+  (nb 07, 08: no TOST for an omnibus) and nb 08's Mann-Whitney (it is significant). **Decided against:** nb 05's granularity
+  features (an omnibus, and 23 to 31 articles per class); nb 07/08 pairwise granularity contrasts (SE about 0.3); nb 08's class
+  field-average rows (shown, all inconclusive); nb 10's interaction and robustness refits (significant); and **nb 11**, where no
+  bound is both defensible and resolvable (+-0.3 per SD of k is 0.15 per year, far looser than nb 10's -0.046 per year; a bound
+  anchored on nb 10's effect is tighter than the +-0.14 intervals) and a BIC-approximation BF (unit-information prior) would be
+  near-decisive for the null at 2 df, against the notebook's own wording ("cannot tell the classes apart, which is not evidence that
+  they are equal"). nb 02, 03, 04, 06 and 09 make no inferential null claim. The continuous feature in nb 05 uses Welch's TOST
+  with the Wilcoxon p beside it: the rank-based interval collapses on tied data (the log of a count).
 - **FWCI is the declared primary endpoint**, as it was in v1. The other two citation DVs are
   secondary operationalizations. No multiplicity correction across the three: they are near
   functions of the same counts, so the effective number of tests is close to one. BH still
@@ -261,9 +297,9 @@ Decisions already taken, each of which needs re-arguing before it is changed:
 
 Still open:
 
-- **Bayes factors are not implemented anywhere.** This is the one reviewer request the current
-  plan does not touch, and it is what would let the null sharing effect be reported as evidence
-  for the null rather than hedged.
+- **The Bayes factors need a sentence on the prior** in the Methods (Normal(0, 0.3) on the log scale for coefficients, JZS
+  Cauchy for the t-tests), and the manuscript has to carry the result as it stands: the evidence for exactly no effect is
+  anecdotal under that prior (see the invariants), while the data exclude effects beyond about 35% for citation counts.
 - **Why time is binned annually.** Worth one sentence in the manuscript, since the reviewer's page-6
   comment suggests expressing things in weeks: OpenAlex serves `counts_by_year`, so annual is the
   finest resolution the source supports. (The granularity version of the dynamics analysis is nb 11.)
@@ -297,7 +333,9 @@ rediscovered or lost. Nothing here is written yet.
   last cells of nb 08's sharing vs. non-sharing section (`field_average`): the unadjusted rows are
   one-sample *t*-tests of `log(Imputed FWCI)` against 0, the adjusted rows Wald tests (z) of Model
   3's prediction for each group with every covariate at its mean. All of these numbers were
-  re-derived from a fresh run of that table.
+  re-derived from a fresh run of that table. The table also carries a TOST within +-0.3 (a ratio of 0.74 to 1.35): sharers sit at the
+  field average within that margin unadjusted (p = 0.019), non-sharers only without the imputed zeros (p = 0.022), and neither
+  row is equivalent after adjustment (p = 0.076, 0.054), so "sits at the average" is not firmer than that.
 
   Two caveats, both of which have to be stated if this is used. The five imputed FWCI zeros sit at
   log -2.3 to -3.0 against a median log-FWCI of -0.02 (about 0), so each is worth about three articles'
@@ -345,8 +383,9 @@ Python 3.14. Dependencies in `requirements.txt`.
 **R** (4.5.2) is used only for the mixed models `statsmodels` cannot fit (Poisson and negative-binomial
 LMEs in nb 10, and the Gaussian one they are compared with), through `lme4`. The package library is `C:\Users\nirjo\R_library\4.5`, and `R_LIBS_USER`
 must point at it (`helpers.config.R_LIBRARY_DIR` does, unless the variable is already set). It holds
-`lme4` 2.0-1, `lmerTest`, `glmmTMB`, `broom.mixed`, `emmeans`, `performance` and `jsonlite`; `DHARMa` and
-`car` are **not** installed. `Rscript` is `C:\Program Files\R\R-4.5.2\bin\Rscript.exe`. Models are fitted by
+`lme4` 2.0-1, `lmerTest`, `glmmTMB`, `broom.mixed`, `emmeans`, `performance` and `jsonlite`, and, for
+`helpers.equivalence`, `TOSTER` 0.8.6, `BayesFactor` 0.9.12-4.8 and `bayesplay` 0.9.3 (run by `helpers/equivalence.R`
+through the same JSON bridge); `DHARMa` and `car` are **not** installed. `Rscript` is `C:\Program Files\R\R-4.5.2\bin\Rscript.exe`. Models are fitted by
 `helpers.r_models.fit_glmm()`, which runs `helpers/fit_glmm.R` as a subprocess and reads the results back as
 JSON: there is no `rpy2` in the venv, and none should be added.
 
@@ -551,7 +590,28 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   (-0.403 to -0.018), i.e. -0.118, -0.053 and -0.104 per year: the intervals overlap widely, so the data
   cannot tell the classes apart, which is not evidence that they are equal. Robustness (Wald omnibus p):
   `log(y + 0.5)` 0.19, `+ 0.1` 0.10, zeros dropped 0.88, `k >= 8` dropped 0.26, Poisson 0.51.
+- **Equivalence and Bayes factors** (bounds and priors in the decisions above; the BFs under the Normal(0, 0.3) prior unless
+  stated). *nb 01:* sharing articles are censused 1.6 days later (Welch 90% CI 0.86 to 2.35), equivalent within +-7 days, p = 8e-26.
+  *nb 05:* log(number of authors) is equivalent within +-0.5 SD (difference -0.035 log units, 90% CI -0.13 to 0.06, Welch p = 0.0014,
+  FDR 0.0042, Wilcoxon p = 0.010, JZS BF01 = 5.6); U.S. authorship is inconclusive (OR 0.80, 90% CI 0.51 to 1.27, TOST p = 0.045, FDR
+  0.067, BF01 = 4.4); open access is inconclusive and leans away from equivalence (OR 2.32, 90% CI 1.08 to 4.52, p = 0.59, BF01 = 1.3).
+  *nb 07:* the unadjusted difference is 0.051 (90% CI -0.16 to 0.26), equivalent within +-0.3 (p = 0.026), one-sided JZS BF01 = 4.7. The
+  sharing coefficient, +-0.3: Model 0 [-0.026, 0.299] p = 0.0495 equivalent (knife-edge), Model 1 [-0.135, 0.285] p = 0.039
+  equivalent, Model 2 [-0.133, 0.305] p = 0.054 inconclusive, Model 3 [-0.178, 0.254] p = 0.023 equivalent; BF01 1.27, 2.21, 2.07, 2.41
+  (anecdotal), 0.88 to 1.48 at SD 0.15 and 2.3 to 4.5 at SD 0.6; granularity omnibus `lmBF` BF01 = 4.2 (error 0.9%). *nb 08:* the FWCI
+  sharing coefficient is inconclusive in all four models (90% upper limits 0.39, 0.34, 0.37, 0.32; TOST p 0.16, 0.084, 0.12, 0.065), BF01
+  1.18, 1.92, 1.73, 2.03 (0.9 to 1.3 at SD 0.15, 2.0 to 3.7 at SD 0.6); the Mann-Whitney's one-sided JZS BF10 = 1.01 (0.76 and 0.56 at
+  the wider scales; the *t*-test on the log scale has one-sided p = 0.050), i.e. **no evidence either way, not "weak support"**; against
+  the field average (+-0.3): sharing articles are equivalent unadjusted (p = 0.019), non-sharing ones only without the imputed zeros
+  (p = 0.022), every other row, including all nine class rows, is inconclusive; granularity omnibus BF01 = 2.0 (error 2.9%). *nb 10:* the
+  sharing main effect at the mean k is equivalent within +-0.3 (0.010, 90% CI -0.14 to 0.16, p = 0.001). *nb 12:* citations, Model 0
+  equivalent with the venue clustering (p = 0.0495) but not with the last-author (0.103) or two-way (0.061) clustering; ML Model 3
+  equivalent with the venue (0.022) and venue + last-author (0.032) intercepts, inconclusive with the last author alone (0.0504); every
+  FWCI row is inconclusive (0.064 to 0.16). Reading: for citation counts the data exclude effects beyond about 35%, but favour exactly no
+  effect only anecdotally; for FWCI they cannot exclude an advantage of up to about 38% (Model 3) to 48% (Model 0).
 - **Covariate comparison**: sharers publish in higher-impact venues, are 4.30x more likely
-  to have a preprint, and are more recent. No difference in author count, U.S. authorship,
-  or open-access status.
+  to have a preprint, and are more recent. Author count does not differ and is equivalent within +-0.5 SD;
+  U.S. authorship does not differ significantly but equivalence is inconclusive; open-access status does not differ
+  significantly after FDR either (p_FDR = 0.082), but the data lean away from equivalence (sharers 91% open access vs 82%, OR 2.3), so
+  "no difference in open access" is **not** supported.
 - Covariate prevalence: preprint 47 (20.1%), U.S. author 99 (42.3%), open access 199 (85.0%).
