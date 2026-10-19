@@ -268,11 +268,13 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   Verbal labels: Lee & Wagenmakers. Where the BF is large only under a wide prior, say so: the prior is the assumption.
   **The two tools have different nulls.** A TOST's H0 is non-equivalence (the effect lies outside the bound), so a small p means
   equivalent; a BF's H0 is an exact point null (no difference, independence), so BF01 > 1 favours exact equality over some
-  difference, not equivalence within the bound. They can disagree and neither is to be read as the other (nb 05 states this).
+  difference, not equivalence within the bound. They can disagree and neither is to be read as the other, which is why nb 05 reports a TOST only (a point-null BF there is
+  easily read as equivalence and adds confusion beside it); where both are reported (nb 07, 08) the notebook says what each answers.
 
-  **Where each goes.** TOST and BF: nb 05 (the three features not significant after FDR), nb 07 and nb 08 (the sharing
+  **Where each goes.** TOST and BF: nb 07 and nb 08 (the sharing
   coefficient of Models 0-3, BF for Model 0 is n/a because of its cluster-robust SEs; nb 07's univariate null). TOST only: nb 01
-  (census times, whose Mann-Whitney is significant), nb 08's field-average rows for sharing vs non-sharing, nb 10's sharing main
+  (census times, whose Mann-Whitney is significant), nb 05 (the three features not significant after FDR; their BFs were dropped,
+  see above), nb 08's field-average rows for sharing vs non-sharing, nb 10's sharing main
   effect at the mean k (the null stated in the Figure 3 caption), nb 12's coefficient tables. BF only: the granularity omnibus tests
   (nb 07, 08: no TOST for an omnibus) and nb 08's Mann-Whitney (it is significant). **Decided against:** nb 05's granularity
   features (an omnibus, and 23 to 31 articles per class); nb 07/08 pairwise granularity contrasts (SE about 0.3); nb 08's class
@@ -602,8 +604,8 @@ If a refactor moves any of these, it is a regression until proven otherwise.
 - **Equivalence and Bayes factors** (bounds and priors in the decisions above; the BFs under the Normal(0, 0.3) prior unless
   stated). *nb 01:* sharing articles are censused 1.6 days later (Welch 90% CI 0.86 to 2.35), equivalent within +-7 days, p = 8e-26.
   *nb 05:* log(number of authors) is equivalent within +-0.5 SD (difference -0.035 log units, 90% CI -0.13 to 0.06, Welch p = 0.0014,
-  FDR 0.0042, Wilcoxon p = 0.010, JZS BF01 = 5.6); U.S. authorship is inconclusive (OR 0.80, 90% CI 0.51 to 1.27, TOST p = 0.045, FDR
-  0.067, BF01 = 4.4); open access is inconclusive: equivalence cannot be established (OR 2.32, 90% CI 1.08 to 4.52, p = 0.59, BF01 = 1.3).
+  FDR 0.0042, Wilcoxon p = 0.010); U.S. authorship is inconclusive (OR 0.80, 90% CI 0.51 to 1.27, TOST p = 0.045, FDR
+  0.067); open access is inconclusive: equivalence cannot be established (OR 2.32, 90% CI 1.08 to 4.52, p = 0.59, smallest bound 4.5).
   *nb 07:* the unadjusted difference is 0.051 (90% CI -0.16 to 0.26), equivalent within +-0.3 (p = 0.026), one-sided JZS BF01 = 4.7. The
   sharing coefficient, +-0.3: Model 0 [-0.026, 0.299] p = 0.0495 equivalent (knife-edge), Model 1 [-0.135, 0.285] p = 0.039
   equivalent, Model 2 [-0.133, 0.305] p = 0.054 inconclusive, Model 3 [-0.178, 0.254] p = 0.023 equivalent; BF01 1.27, 2.21, 2.07, 2.41
