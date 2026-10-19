@@ -138,11 +138,11 @@ def tost_coefficient(result: Any, term: str, bound: float = LOG_BOUND, alpha: fl
     model's own tests use: t on the residual (or, with cluster-robust SEs, the cluster) degrees of freedom for OLS, the
     normal for a mixed model."""
     return tost_from_estimate(
-        float(result.params[term]), float(result.bse[term]), -bound, bound, _reference_df(result), alpha, test=f"TOST of {term}",
+        float(result.params[term]), float(result.bse[term]), -bound, bound, reference_df(result), alpha, test=f"TOST of {term}",
     )
 
 
-def _reference_df(result: Any) -> Optional[float]:
+def reference_df(result: Any) -> Optional[float]:
     """The degrees of freedom of the t reference a fitted statsmodels model uses for its coefficients, or None for the normal."""
     if not getattr(result, "use_t", False):
         return None
@@ -235,7 +235,7 @@ def bf_from_estimate(estimate: float, se: float, prior_sd: float = LOG_BOUND, df
 
 def bf_coefficient(result: Any, term: str, prior_sd: float = LOG_BOUND) -> BayesFactor:
     """`bf_from_estimate` for one coefficient of a fitted statsmodels model, with the reference distribution its own tests use."""
-    return bf_from_estimate(float(result.params[term]), float(result.bse[term]), prior_sd, _reference_df(result))
+    return bf_from_estimate(float(result.params[term]), float(result.bse[term]), prior_sd, reference_df(result))
 
 
 def bf_term(
