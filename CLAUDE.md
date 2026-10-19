@@ -383,7 +383,8 @@ Use the project venv — the system Python does not have the required packages:
 ./.venv/Scripts/python.exe
 ```
 
-Python 3.14. Dependencies in `requirements.txt`.
+Python 3.14. Python dependencies are in `python_requirements.txt` (pinned to the versions the analyses were run with) and the R
+ones in `r_requirements.txt` (R 4.5.2); keep both in step when a package is added or upgraded.
 
 **R** (4.5.2) is used only for the mixed models `statsmodels` cannot fit (Poisson and negative-binomial
 LMEs in nb 10, and the Gaussian one they are compared with), through `lme4`. The package library is `C:\Users\nirjo\R_library\4.5`, and `R_LIBS_USER`
