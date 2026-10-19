@@ -274,8 +274,9 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   **Where each goes.** TOST and BF: nb 07 and nb 08 (the sharing
   coefficient of Models 0-3, BF for Model 0 is n/a because of its cluster-robust SEs; nb 07's univariate null). TOST only: nb 01
   (census times, whose Mann-Whitney is significant), nb 05 (the three features not significant after FDR; their BFs were dropped,
-  see above), nb 08's field-average rows for sharing vs non-sharing, nb 10's sharing main
-  effect at the mean k (the null stated in the Figure 3 caption), nb 12's coefficient tables. BF only: the granularity omnibus tests
+  see above), nb 08's field-average rows for sharing vs non-sharing, nb 10's sharing
+  coefficient at the average time since publication (a conditional claim, not an overall effect: the interaction is significant and
+  the curves cross near that point; the null stated in the Figure 3 caption), nb 12's coefficient tables. BF only: the granularity omnibus tests
   (nb 07, 08: no TOST for an omnibus) and nb 08's Mann-Whitney (it is significant). **Decided against:** nb 05's granularity
   features (an omnibus, and 23 to 31 articles per class); nb 07/08 pairwise granularity contrasts (SE about 0.3); nb 08's class
   field-average rows (shown, all inconclusive); nb 10's interaction and robustness refits (significant); and **nb 11**, where no
@@ -304,7 +305,13 @@ Still open:
 
 - **The Bayes factors need a sentence on the prior** in the Methods (Normal(0, 0.3) on the log scale for coefficients, JZS
   Cauchy for the t-tests), and the manuscript has to carry the result as it stands: the evidence for exactly no effect is
-  anecdotal under that prior (see the invariants), while the data exclude effects beyond about 35% for citation counts.
+  anecdotal under that prior (see the invariants), while the data exclude effects beyond about 35% for citation counts. Draft
+  Methods sentence: *Bayes factors for the sharing coefficient were computed from the coefficient and its standard error (a normal
+  likelihood, and a t on the cluster degrees of freedom for the cluster-robust model), with H0 an effect of exactly zero and H1 a
+  normal prior centred at zero with an SD of 0.3 on the log scale (the smallest effect of interest), repeated at other SDs (0.15 to
+  0.6) to show the dependence on the prior (Dienes & Mclatchie, 2018; bayesplay 0.9.3); the one-sided univariate comparison used the
+  default JZS Bayes factor (a Cauchy prior of scale sqrt(2)/2; Rouder et al., 2009; BayesFactor 0.9.12-4.8). We report BF01 with the
+  verbal labels of Lee and Wagenmakers (2013).*
 - **Why time is binned annually.** Worth one sentence in the manuscript, since the reviewer's page-6
   comment suggests expressing things in weeks: OpenAlex serves `counts_by_year`, so annual is the
   finest resolution the source supports. (The granularity version of the dynamics analysis is nb 11.)
@@ -615,8 +622,9 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   1.18, 1.92, 1.73, 2.03 (0.9 to 1.3 at SD 0.15, 2.0 to 3.7 at SD 0.6); the Mann-Whitney's one-sided JZS BF10 = 1.01 (0.76 and 0.56 at
   the wider scales; the *t*-test on the log scale has one-sided p = 0.050), i.e. **no evidence either way, not "weak support"**; against
   the field average (+-0.3): sharing articles are equivalent unadjusted (p = 0.019), non-sharing ones only without the imputed zeros
-  (p = 0.022), every other row, including all nine class rows, is inconclusive; granularity omnibus BF01 = 2.0 (error 2.9%). *nb 10:* the
-  sharing main effect at the mean k is equivalent within +-0.3 (0.010, 90% CI -0.14 to 0.16, p = 0.001). *nb 12:* citations, Model 0
+  (p = 0.022), every other row, including all nine class rows, is inconclusive; granularity omnibus BF01 = 2.0 (error 2.9%). *nb 10:* at
+  the average time since publication the groups are equivalent within +-0.3 (0.010, 90% CI -0.14 to 0.16, p = 0.001); say it that way
+  ("no difference at the average year, while the trajectories diverge"), also in the Figure 3 caption, not as "no effect of sharing". *nb 12:* citations, Model 0
   equivalent with the venue clustering (p = 0.0495) but not with the last-author (0.103) or two-way (0.061) clustering; ML Model 3
   equivalent with the venue (0.022) and venue + last-author (0.032) intercepts, inconclusive with the last author alone (0.0504); every
   FWCI row is inconclusive (0.064 to 0.16). Reading: for citation counts the data exclude effects beyond about 35%, but favour exactly no
