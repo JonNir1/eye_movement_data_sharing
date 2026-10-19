@@ -20,7 +20,8 @@ output/
 *.docx
 *.doc
 *.txt
-!requirements.txt
+!python_requirements.txt
+!r_requirements.txt
 *.png
 *.tmp
 

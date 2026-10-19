@@ -1,0 +1,17 @@
+# R 4.5.2 (2025-10-31). Pinned to the versions the analyses were run with.
+# Library: C:\Users\nirjo\R_library\4.5 (helpers.config.R_LIBRARY_DIR points at it). The code calls R through
+# helpers/fit_glmm.R and helpers/equivalence.R, which load only the packages below.
+#
+# Install a package into that library with, for example:
+#   Rscript -e 'install.packages("BayesFactor", lib = "C:/Users/nirjo/R_library/4.5", repos = "https://cloud.r-project.org")'
+# (a pinned older version needs the CRAN archive, or remotes::install_version).
+lme4==2.0.1
+lmerTest==3.2.1
+performance==0.17.0
+jsonlite==2.0.0
+MASS==7.3.65            # ships with R
+TOSTER==0.8.6
+BayesFactor==0.9.12.4.8
+bayesplay==0.9.3
+#
+# Installed in the library but not used by the code: glmmTMB 1.1.14, broom.mixed 0.2.9.7, emmeans 2.0.3
