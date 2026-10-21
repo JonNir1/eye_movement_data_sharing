@@ -17,7 +17,7 @@ current in-progress revision; `brief report.pdf` is the version that was submitt
 
 ```
 data/       acquisition only - OpenAlex/CrossRef fetching, and _api_secrets.py
-analysis/   twelve notebooks, one per research question (the twelfth for ad-hoc checks), plus helpers/
+analysis/   eleven numbered notebooks, one per research question, plus 99_ad_hoc_analyses and helpers/
 output/     exported figures
 data_store/ source data AND the derived parquet frames (gitignored)
 ```
@@ -60,7 +60,7 @@ between notebooks.
 | `09_results_figures` | The manuscript figures that summarize nb 07 and nb 08 together: sharing vs. non-sharing violins and the supplementary granularity bars |
 | `10_citation_dynamics` | When does the advantage appear, and does it persist? |
 | `11_granularity_dynamics` | Within the 80 sharing articles, do the three granularities differ in how their yearly citations change over time? |
-| `12_ad_hoc_analyses` | Would a choice the reported models make change the conclusion? (Not part of the analysis plan; nothing here is reported. Currently: last-author (lab) clustering.) |
+| `99_ad_hoc_analyses` | Would a choice the reported models make change the conclusion? (Not part of the analysis plan; nothing here is reported. Numbered 99 to keep it clear of the research questions. Currently: last-author (lab) clustering, and cumulative citations.) |
 
 `analysis/helpers/` holds only code that two or more notebooks import (`config`, `dataset`,
 `stats`, `plotting`, `r_models`, `dynamics`, `equivalence`). Single-notebook helpers stay inline on purpose. There is no
@@ -276,7 +276,7 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   (census times, whose Mann-Whitney is significant), nb 05 (the three features not significant after FDR; their BFs were dropped,
   see above), nb 08's field-average rows for sharing vs non-sharing, nb 10's sharing
   coefficient at the average time since publication (a conditional claim, not an overall effect: the interaction is significant and
-  the curves cross near that point; the null stated in the Figure 3 caption), nb 12's coefficient tables. BF only: the granularity omnibus tests
+  the curves cross near that point; the null stated in the Figure 3 caption), nb 99's coefficient tables and its year-1 gap. BF only: the granularity omnibus tests
   (nb 07, 08: no TOST for an omnibus) and nb 08's Mann-Whitney (it is significant). **Decided against:** nb 05's granularity
   features (an omnibus, and 23 to 31 articles per class); nb 07/08 pairwise granularity contrasts (SE about 0.3); nb 08's class
   field-average rows (shown, all inconclusive); nb 10's interaction and robustness refits (significant); and **nb 11**, where no
@@ -624,11 +624,26 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   the field average (+-0.3): sharing articles are equivalent unadjusted (p = 0.019), non-sharing ones only without the imputed zeros
   (p = 0.022), every other row, including all nine class rows, is inconclusive; granularity omnibus BF01 = 2.0 (error 2.9%). *nb 10:* at
   the average time since publication the groups are equivalent within +-0.3 (0.010, 90% CI -0.14 to 0.16, p = 0.001); say it that way
-  ("no difference at the average year, while the trajectories diverge"), also in the Figure 3 caption, not as "no effect of sharing". *nb 12:* citations, Model 0
+  ("no difference at the average year, while the trajectories diverge"), also in the Figure 3 caption, not as "no effect of sharing". *nb 99:* citations, Model 0
   equivalent with the venue clustering (p = 0.0495) but not with the last-author (0.103) or two-way (0.061) clustering; ML Model 3
   equivalent with the venue (0.022) and venue + last-author (0.032) intercepts, inconclusive with the last author alone (0.0504); every
   FWCI row is inconclusive (0.064 to 0.16). Reading: for citation counts the data exclude effects beyond about 35%, but favour exactly no
   effect only anecdotally; for FWCI they cannot exclude an advantage of up to about 38% (Model 3) to 48% (Model 0).
+- **No early citation advantage survives adjustment (nb 99, ad-hoc, nothing reported)**. Prompted by Colavizza et al.
+  (2020), who report about 25% more citations for a data availability statement linking a repository, over a three-year
+  window anchored on the publication *month*. That estimand is not reproducible here (OpenAlex serves `counts_by_year`, so
+  the calendar year is the floor, and year 0 is then a partial year of varying length), so the section asks the two questions
+  the result raises rather than chasing the number. **Year 1:** unadjusted Mann-Whitney one-sided p = 0.003 (two-sided
+  0.006, rank-biserial 0.21, CLES 0.61, means 3.65 vs 2.42, medians both 2.0, so much of it is the upper tail); adjusted
+  (nb 10's winner, the gap at k = 1) b = 0.131 on log(1 + y), 95% CI -0.059 to 0.321, ratio 1.14, p = 0.18, and equivalent
+  within +-0.3 (TOST p = 0.040), i.e. an advantage beyond about 35% is excluded. On the count scale the same contrast is
+  3.22 vs 2.70 citations, ratio 1.19 (the two ratios differ because one compares geometric means of 1 + y and the other
+  back-transformed means). **Years 1 to 3 cumulative:** unadjusted p = 0.019 (two-sided 0.039, CLES 0.58, means 12.0 vs
+  9.2); adjusted 10.36 vs 9.29 predicted citations, difference +1.07 (95% CI -1.29 to +3.42, ratio 1.115, p = 0.37, a
+  delta-method SE with the variance components held fixed, so slightly optimistic). Pooling the three years dilutes rather
+  than strengthens, which is the significant sharing-by-time interaction restated. The predicted non-sharing total (9.29)
+  sits on the observed mean (9.21), so the back-transform is calibrated; the sharing one (10.36 against an observed 12.03)
+  is the adjustment. Colavizza's 25% falls inside both adjusted intervals, so these data neither reproduce nor exclude it.
 - **Covariate comparison**: sharers publish in higher-impact venues, are 4.30x more likely
   to have a preprint, and are more recent. Author count does not differ and is equivalent within +-0.5 SD;
   U.S. authorship does not differ significantly but equivalence is inconclusive; open-access status does not differ
