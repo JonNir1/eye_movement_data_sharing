@@ -17,7 +17,7 @@ current in-progress revision; `brief report.pdf` is the version that was submitt
 
 ```
 data/       acquisition only - OpenAlex/CrossRef fetching, and _api_secrets.py
-analysis/   eleven numbered notebooks, one per research question, plus 99_ad_hoc_analyses and helpers/
+analysis/   twelve numbered notebooks, one per research question, plus 99_ad_hoc_analyses and helpers/
 output/     exported figures
 data_store/ source data AND the derived parquet frames (gitignored)
 ```
@@ -60,7 +60,8 @@ between notebooks.
 | `09_results_figures` | The manuscript figures that summarize nb 07 and nb 08 together: sharing vs. non-sharing violins and the supplementary granularity bars |
 | `10_citation_dynamics` | When does the advantage appear, and does it persist? |
 | `11_granularity_dynamics` | Within the 80 sharing articles, do the three granularities differ in how their yearly citations change over time? |
-| `99_ad_hoc_analyses` | Would a choice the reported models make change the conclusion? (Not part of the analysis plan; nothing here is reported. Numbered 99 to keep it clear of the research questions. Currently: last-author (lab) clustering, and cumulative citations.) |
+| `12_cumulative_citations` | Do sharing articles start ahead, in their first year and over their first three years, and does the gap survive adjustment? |
+| `99_ad_hoc_analyses` | Would a choice the reported models make change the conclusion? (Not part of the analysis plan; nothing here is reported. Numbered 99 to keep it clear of the research questions. Currently: last-author (lab) clustering.) |
 
 `analysis/helpers/` holds only code that two or more notebooks import (`config`, `dataset`,
 `stats`, `plotting`, `r_models`, `dynamics`, `equivalence`). Single-notebook helpers stay inline on purpose. There is no
@@ -276,7 +277,7 @@ Decisions already taken, each of which needs re-arguing before it is changed:
   (census times, whose Mann-Whitney is significant), nb 05 (the three features not significant after FDR; their BFs were dropped,
   see above), nb 08's field-average rows for sharing vs non-sharing, nb 10's sharing
   coefficient at the average time since publication (a conditional claim, not an overall effect: the interaction is significant and
-  the curves cross near that point; the null stated in the Figure 3 caption), nb 99's coefficient tables and its year-1 gap. BF only: the granularity omnibus tests
+  the curves cross near that point; the null stated in the Figure 3 caption), nb 12's year-1 gap, nb 99's coefficient tables. BF only: the granularity omnibus tests
   (nb 07, 08: no TOST for an omnibus) and nb 08's Mann-Whitney (it is significant). **Decided against:** nb 05's granularity
   features (an omnibus, and 23 to 31 articles per class); nb 07/08 pairwise granularity contrasts (SE about 0.3); nb 08's class
   field-average rows (shown, all inconclusive); nb 10's interaction and robustness refits (significant); and **nb 11**, where no
@@ -629,7 +630,10 @@ If a refactor moves any of these, it is a regression until proven otherwise.
   equivalent with the venue (0.022) and venue + last-author (0.032) intercepts, inconclusive with the last author alone (0.0504); every
   FWCI row is inconclusive (0.064 to 0.16). Reading: for citation counts the data exclude effects beyond about 35%, but favour exactly no
   effect only anecdotally; for FWCI they cannot exclude an advantage of up to about 38% (Model 3) to 48% (Model 0).
-- **No early citation advantage survives adjustment (nb 99, ad-hoc, nothing reported)**. Prompted by Colavizza et al.
+- **No early citation advantage survives adjustment (nb 12)**. Whether any of this reaches the manuscript is **still
+  open**: it was not in the analysis plan and both results are null, so the current intention is one Discussion sentence
+  beside the Colavizza citation (the two adjusted estimates with their intervals, pointing at the repository), not a
+  Results subsection. Prompted by Colavizza et al.
   (2020), who report about 25% more citations for a data availability statement linking a repository, over a three-year
   window anchored on the publication *month*. That estimand is not reproducible here (OpenAlex serves `counts_by_year`, so
   the calendar year is the floor, and year 0 is then a partial year of varying length), so the section asks the two questions
