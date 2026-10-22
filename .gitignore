@@ -25,8 +25,11 @@ output/
 *.png
 *.tmp
 
-# Source data plus the derived parquet frames (see helpers/config.py)
-data_store/
+# Source data plus the derived parquet frames (see helpers/config.py).
+# The contents are ignored rather than the directory itself: git cannot re-include a file
+# whose parent directory is excluded, so `data_store/` would make the negation below a no-op.
+data_store/*
+!data_store/README.md
 
 # --- Python ---
 __pycache__/
