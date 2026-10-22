@@ -11,9 +11,9 @@ from the open-science audit of
 > <https://doi.org/10.3758/s13428-025-02759-3>
 
 and the citation indicators, the preprint detection and the analytic sample were added for the accompanying
-report, *Data Sharing and Citation Impact in Visual Search Research* (under review; preprint at
-<https://osf.io/preprints/psyarxiv/q8jrd>). If you use this file, please cite both: Godwin et al. for the
-sharing coding, and the report for the joined dataset.
+report, *Data Sharing and Citation Impact in Visual Search Research* (Behavior Research Methods *under review*;
+preprint at <https://osf.io/preprints/psyarxiv/q8jrd>).<br>
+If you use this file, please cite both: Godwin et al. for the sharing coding, and the report for the joined dataset.
 
 ## How it was curated
 
