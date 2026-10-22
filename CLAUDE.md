@@ -19,13 +19,19 @@ current in-progress revision; `brief report.pdf` is the version that was submitt
 data/       acquisition only - OpenAlex/CrossRef fetching, and _api_secrets.py
 analysis/   twelve numbered notebooks, one per research question, plus 99_ad_hoc_analyses and helpers/
 output/     exported figures
-data_store/ source data AND the derived parquet frames (gitignored)
+data_store/ source data AND the derived parquet frames (gitignored, except README.md)
 ```
 
 **`data_store/` is not safe to delete.** It holds the two irreplaceable source files -
 `Godwin_2025_dataset.xlsx` and the frozen `Godwin_2025_metadata.csv` - alongside the
 regenerable `*.parquet` frames. To force a rebuild, delete only the parquet files, or call
 `load_or_build(rebuild=True)`.
+
+`data_store/README.md` is the one tracked file in that directory (`.gitignore` excludes `data_store/*` and
+negates the README; it cannot exclude the directory itself, or the negation would be a no-op). It is the
+guide for the public release of the dataset: what the corpus is, how it was curated, which columns come from
+Godwin et al. and which from OpenAlex, and the "Data Integrity" record of the duplicate and unretrieved
+records (see "Sample construction").
 
 **The parquet cache is a pure function of `(Godwin_2025_dataset.xlsx, Godwin_2025_metadata.csv)`**
 - `build_merged()` / `build_analytic_sample()` read only those two files, with no other input and
@@ -485,6 +491,24 @@ filters and reach the dedup step, which drops one; for the other 2 pairs
 (`10.1177/1747021820919351`, `10.3758/s13423-021-01920-1`) only one copy ever reaches that step,
 its sibling having already failed topic/year/retraction for unrelated reasons - so the cascade
 never "sees" a duplicate there, even though the wider diagnostic correctly does.
+
+**Both known data-integrity problems are written up in `data_store/README.md`, under "Data Integrity", and
+that is the reference copy.** It lists the 8 duplicate pairs one row each (both source rows, DOI, title,
+authors, the two sharing codes and which copy survived), and the 11 records that failed the OpenAlex lookup
+with their hand-recovered DOIs and titles. Keep it in step with any change here.
+
+**The 11 failed lookups are not a neutral technical loss.** Every one of them has no title and no authors in
+Godwin et al.'s sheet, only a link, so the title fallback could not run either; 9 failed because the
+publisher blocked the URL and 2 got a 404 from OpenAlex (one DOI carries a trailing period that `DOI_PATTERN`
+captures, the other a `v1` version suffix). But Godwin et al. audited all 11 and found an OSF link for each:
+**10 of the 11 shared data** (8 FIXATION, 2 TRIAL) and the 11th shared materials, an experiment and a
+codebook but no data. Recovering the 9 that are genuine journal articles would move the sample to N = 243,
+sharing to 88 and FIXATION to 37. They are **not** recovered: the pipeline is unchanged and the README table
+exists so the loss is visible. Two of the 11 need more than a corrected DOI, and neither should be added as
+it stands: `10.1037/xap0000235` is a correction notice whose codes belong to the underlying study
+`10.1037/xap0000155` (absent from the corpus), and `10.1101/2021.02.05.429946` is a bioRxiv preprint,
+excluded from further analyses. If the sample is ever rebuilt, this is the decision to re-argue first, and
+the Methods sentence "11 queries were unsuccessful" understates it in the meantime.
 
 ## Conventions that should not change silently
 
