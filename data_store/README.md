@@ -161,3 +161,79 @@ those rows were excluded, so it is null throughout. And the per-year columns do 
 because OpenAlex's own `cited_by_count` and its year-by-year breakdown are compiled separately. Use
 `TotalCitations` for a total up to the `LastUpdate` date, and the year columns for anything about timing, but do not expect them to
 reconcile exactly.
+
+## Data Integrity
+
+Two known problems in the source data, recorded here so that anyone reusing the corpus can see what was
+removed and what was lost. Neither originates in this dataset: both come from Godwin et al.'s spreadsheet or
+from the automated lookup, and both are documented rather than silently repaired.
+
+### Duplicate Records
+
+Eight articles appear **twice** in Godwin et al.'s spreadsheet, once keyed by a bare DOI with a title, and
+once by a publisher URL with the title missing. Because both the link and the title differ between the two
+copies, de-duplicating on `(PAPER_LINK, PAPER_TITLE)` does not catch them; they collapse only once OpenAlex
+resolves both forms to the same DOI, which is why the exclusion cascade reports them as "duplicate DOIs".
+
+**Five of the eight pairs carry conflicting sharing codes**, one copy recording a granularity and the other
+recording none. A naive keep-first de-duplication would therefore change an article's classification
+depending on row order, so `prepare_data._SHARING_CORRECTIONS` pins the class for all eight by DOI.
+
+Row numbers are 0-based positions in the source sheet; add 2 for the Excel row number.
+
+| Rows | DOI | Title | Authors | Sharing codes | Kept |
+|---|---|---|---|---|---|
+| 10 / 86 | 10.3758/s13414-018-1579-7 | Lack of free choice reveals the cost of multiple-target search within and across feature dimensions | Ort, E; Fahrenfort, JJ; Olivers, CNL | FIXATION / FIXATION | 10 |
+| 21 / 82 | 10.3758/s13423-021-01944-7 | Understanding the collinear masking effect in visual search through eye tracking | Hsiao, JH; Chan, AB; An, J; Yeh, S; Jingling, L | PARTICIPANT / PARTICIPANT | 21 |
+| 75 / 84 | 10.1038/s41598-018-37548-w | Searchers adjust their eye-movement dynamics to target characteristics in natural scenes | Rothkegel, LOM; Schütt, HH; Trukenbrod, HA; Wichmann, FA; Engbert, R | FIXATION / FIXATION | 75 |
+| 83 / 109 | 10.3758/s13414-017-1328-3 | Comparing visual search and eye movements in bilinguals and monolinguals | Ratiu, I; Hout, MC; Walenchok, SC; Azuma, T; Goldinger, SD | **FIXATION / NONE** | 83 |
+| 88 / 216 | 10.3758/s13414-017-1354-1 | Categorical templates are more useful when features are consistent: Evidence from eye movements during search for societally important vehicles | Hout, MC; Robbins, A; Godwin, HJ; Fitzsimmons, G; Scarince, C | **FIXATION / NONE** | 88 |
+| 98 / 358 | 10.1177/1747021820919351 | Dynamics of attentional and oculomotor orienting in visual foraging tasks | Tagu, J; Kristjánsson, Á | **FIXATION / NONE** | 98 |
+| 99 / 295 | 10.3758/s13423-021-01920-1 | Eye-movements reveal semantic interference effects during the encoding of naturalistic scenes in long-term memory | Mikhailova, A; Raposo, A; Della Sala, S; Coco, MI | **TRIAL / NONE** | 99 |
+| 104 / 217 | 10.3758/s13414-021-02336-8 | Comparing imagery and perception: Using eye movements to dissociate mechanisms in search | Cochrane, BA; Wang, C; Pratt, J; Milliken, B; Sun, H | **TRIAL / NONE** | 104 |
+
+All eight surviving copies are in the N = 234 sample. The exclusion cascade nonetheless reports only **six**
+duplicate removals, because it de-duplicates *after* the topic, year and retraction filters: for two pairs
+(10.1177/1747021820919351 and 10.3758/s13423-021-01920-1) the sibling had already been filtered out for
+unrelated reasons, so the cascade never saw a duplicate there. Do not read the cascade's "6" as the number
+of duplicates in the corpus; it is eight.
+
+### Incorrect Records
+
+Eleven records passed the topic and year filters but could not be matched to OpenAlex automatically, and
+were dropped. In every case Godwin et al.'s sheet gives **no title and no authors, only a link**, so the
+title-based fallback could not run either. Nine failed because the publisher blocked the attempt to resolve
+the URL; two reached OpenAlex and received a 404.
+
+The DOIs and titles below were recovered by hand. They are **not** applied anywhere in the pipeline: these
+eleven records remain excluded from the N = 234 sample, and this table exists so that the loss is visible
+and the records are recoverable.
+
+| Correct DOI | Title | Godwin class | Why the lookup failed |
+|---|---|---|---|
+| 10.1167/jov.20.7.8 | How spatial frequencies and color drive object search in real-world scenes: A new eye-movement corpus | FIXATION | publisher blocked the URL (jov.arvojournals.org) |
+| 10.1167/17.12.8 | To search or to like: Mapping fixations to differentiate two forms of incidental scene memory | TRIAL | publisher blocked the URL (jov.arvojournals.org) |
+| 10.1167/18.13.11 | Anchoring visual search in scenes: Assessing the role of anchor objects on eye movements during visual search | FIXATION | publisher blocked the URL (jov.arvojournals.org) |
+| 10.1037/xap0000235 | Correction to Muhl-Richardson et al. (2018) | FIXATION | OpenAlex 404: the sheet's DOI carries a **trailing period**, which `DOI_PATTERN` captures |
+| 10.3390/brainsci11030283 | Saliency-Aware Subtle Augmentation Improves Human Visual Search Performance in VR | FIXATION | publisher blocked the URL (mdpi.com) |
+| 10.1037/xhp0000618 | Expectations and perceptual priming in a visual search task: Evidence from eye movements and behavior | FIXATION | publisher blocked the URL (psycnet.apa.org) |
+| 10.1016/j.chbr.2021.100127 | Assessing how visual search entropy and engagement predict performance in a multiple-objects tracking air traffic control task | TRIAL | publisher blocked the URL (sciencedirect.com) |
+| 10.1016/j.cortex.2020.12.019 | Spatial attention and spatial short term memory in PSP and Parkinson's disease | NONE | publisher blocked the URL (sciencedirect.com) |
+| 10.1016/j.cognition.2021.104935 | The selection balance: Contrasting value, proximity and priming in a multitarget foraging task | FIXATION | publisher blocked the URL (sciencedirect.com) |
+| 10.1016/j.cognition.2019.104149 | Active sampling in visual search is coupled to the cardiac cycle | FIXATION | publisher blocked the URL (sciencedirect.com) |
+| 10.1101/2021.02.05.429946 | Pupil Size Reflects Exploration and Exploitation in Visual Search (and It's Like Object-Based Attention) | FIXATION | OpenAlex 404: the link carries the **version suffix** `v1` |
+
+Two of the eleven need more than a corrected DOI:
+
+- **10.1037/xap0000235 is a correction notice, not primary research.** Its sharing codes describe the study
+  being corrected, **10.1037/xap0000155** (*Individual differences in search and monitoring for color targets
+  in dynamic visual displays*), which is itself absent from Godwin et al.'s corpus. If this record is ever
+  recovered, **the correction notice should be replaced by its underlying study**.
+- **10.1101/2021.02.05.429946 is a bioRxiv preprint**, not a journal article, and its `YEAR_PUBLISHED` (2019)
+  conflicts with the date encoded in its DOI (2021-02-05). It is **excluded from further analyses**.
+
+The loss is not neutral with respect to data sharing. Godwin et al. audited all eleven and found an OSF link
+for every one: **ten shared eye-movement data** (eight at fixation level, two at trial level), and the
+eleventh shared materials, an experiment and a codebook but no data. Recovering the nine that are genuine
+journal articles, i.e. excluding the correction notice and the preprint, would take the sample from 234 to
+243 articles, the sharing group from 80 to 88, and the fixation class from 31 to 37.
